@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import Hls from 'hls.js';
 import { api, beaconProgress, formatTime, streamUrl } from '../api';
+import { PlayerControls, restoreVolume } from '../components/PlayerControls';
 import type { EpgItem } from '../types';
 
 type PlayType = 'movie' | 'episode' | 'live';
@@ -28,7 +29,12 @@ export function Player() {
   const { type = 'movie', id = '' } = useParams<{ type: PlayType; id: string }>();
   const [params] = useSearchParams();
   const nav = useNavigate();
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const toggleRef = useRef<(() => void) | null>(null);
+  const clickTimer = useRef<number | null>(null);
+  // The controls need the element itself, not a ref: keep it in state so they re-subscribe when it mounts.
+  const [videoEl, setVideoEl] = useState<HTMLVideoElement | null>(null);
   const hlsRef = useRef<Hls | null>(null);
   const [meta, setMeta] = useState<Meta | null>(null);
   const [epg, setEpg] = useState<EpgItem[]>([]);
@@ -187,10 +193,11 @@ export function Player() {
     };
   }, [meta]);
 
-  // Auto-hide overlay.
+  // Auto-hide overlay. While playback is paused the bar stays up: there is nothing to watch behind it.
   const poke = () => {
     setShowUi(true);
     if (hideTimer.current) window.clearTimeout(hideTimer.current);
+    if (videoRef.current?.paused) return;
     hideTimer.current = window.setTimeout(() => setShowUi(false), 3500);
   };
   useEffect(() => {
@@ -202,13 +209,42 @@ export function Player() {
   }, []);
 
   useEffect(() => {
-    const v = videoRef.current;
-    if (v) v.focus();
+    containerRef.current?.focus({ preventScroll: true });
   }, [meta]);
+
+  const setVideoRef = (el: HTMLVideoElement | null) => {
+    videoRef.current = el;
+    setVideoEl(el);
+  };
+
+  const focusPlay = () => containerRef.current?.querySelector<HTMLElement>('[data-pc="play"]')?.focus();
+
+  // A single click toggles playback, a double click goes fullscreen: hold the first click briefly
+  // so a double click does not also flip play/pause on the way.
+  const onVideoClick = () => {
+    if (clickTimer.current) window.clearTimeout(clickTimer.current);
+    clickTimer.current = window.setTimeout(() => {
+      clickTimer.current = null;
+      toggleRef.current?.();
+    }, 200);
+  };
+  const onVideoDoubleClick = () => {
+    if (clickTimer.current) window.clearTimeout(clickTimer.current);
+    clickTimer.current = null;
+    void (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()).catch(() => {});
+  };
+  useEffect(
+    () => () => {
+      if (clickTimer.current) window.clearTimeout(clickTimer.current);
+    },
+    [],
+  );
 
   const onLoaded = () => {
     const v = videoRef.current;
-    if (!v || !meta || meta.type === 'live') return;
+    if (!v) return;
+    restoreVolume(v);
+    if (!meta || meta.type === 'live') return;
     if (meta.resumeAt > 0 && meta.resumeAt < v.duration - 10) v.currentTime = meta.resumeAt;
     void v.play().catch(() => {});
   };
@@ -273,25 +309,29 @@ export function Player() {
     }
   };
 
-  // Space / Enter / play-pause key: toggle exactly once. Chromium's native controls also react to
-  // these keys (a focused control button "clicks" on keyup, the element itself toggles on keydown),
-  // which used to double-toggle. Intercepting in the capture phase on window, before the event
-  // reaches the video or its shadow controls, and stopping it there leaves only our toggle.
+  // Space / Enter / play-pause key: toggle exactly once. The browser reacts to these keys on its
+  // own (a focused element "clicks" on keyup, the media element toggles on keydown), which used to
+  // double-toggle. Intercepting in the capture phase on window, before the event reaches anything
+  // else, and stopping it there leaves only our toggle. The window is the whole player surface —
+  // except our own buttons and sliders, where Enter/Space must activate the control under focus.
   useEffect(() => {
     const isToggleKey = (k: string) => k === ' ' || k === 'Enter' || k === 'MediaPlayPause';
+    const wants = (e: KeyboardEvent) => {
+      if (!isToggleKey(e.key)) return false;
+      const a = document.activeElement;
+      if (!a || !containerRef.current?.contains(a)) return false;
+      return a.tagName !== 'BUTTON' && a.tagName !== 'INPUT' && a.tagName !== 'A';
+    };
     const onDown = (e: KeyboardEvent) => {
-      const v = videoRef.current;
-      if (!v || !isToggleKey(e.key) || document.activeElement !== v) return;
+      if (!videoRef.current || !wants(e)) return;
       e.preventDefault();
       e.stopPropagation();
       if (e.repeat) return; // holding the key must not flicker between play and pause
       poke();
-      if (v.paused) void v.play().catch(() => {});
-      else v.pause();
+      toggleRef.current?.();
     };
     const onUp = (e: KeyboardEvent) => {
-      const v = videoRef.current;
-      if (!v || !isToggleKey(e.key) || document.activeElement !== v) return;
+      if (!videoRef.current || !wants(e)) return;
       e.preventDefault();
       e.stopPropagation();
     };
@@ -307,55 +347,81 @@ export function Player() {
   const onKey = (e: React.KeyboardEvent) => {
     const v = videoRef.current;
     if (!v) return;
+    // Focus sitting on one of our controls: arrows belong to spatial navigation (and to the
+    // timeline's own handler), only the letter shortcuts stay global.
+    const active = document.activeElement;
+    const onControl = !!active && active !== containerRef.current && !!(active as HTMLElement).closest?.('.player-controls');
+    const wasHidden = !showUi;
     poke();
+    const take = () => {
+      e.preventDefault();
+      e.stopPropagation(); // keep spatial navigation from also moving the focus
+    };
+    switch (e.key) {
+      case 'm':
+      case 'M':
+        take();
+        v.muted = !v.muted;
+        return;
+      case 'n':
+      case 'N':
+        take();
+        goNext();
+        return;
+      case 'f':
+      case 'F':
+        take();
+        void (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()).catch(() => {});
+        return;
+    }
+    if (onControl) return;
+    // First keystroke while the bar is hidden: bring it up and park the focus on Play/Pausa,
+    // so a remote can walk the controls from there.
+    const parkFocus = () => wasHidden && focusPlay();
     if (isLive) {
       switch (e.key) {
         case 'ArrowUp':
         case 'ChannelUp':
         case 'PageUp':
-          e.preventDefault();
+          take();
           goChannel(meta?.nextChannel);
           return;
         case 'ArrowDown':
         case 'ChannelDown':
         case 'PageDown':
-          e.preventDefault();
+          take();
           goChannel(meta?.prevChannel);
           return;
         case 'ArrowLeft':
         case 'ArrowRight':
-          e.preventDefault();
+          take();
+          parkFocus();
           return;
       }
+      parkFocus();
+      return;
     }
     switch (e.key) {
       case 'ArrowRight':
       case 'MediaFastForward':
-        e.preventDefault();
+        take();
         v.currentTime = Math.min(v.duration || Infinity, v.currentTime + 10);
         break;
       case 'ArrowLeft':
       case 'MediaRewind':
-        e.preventDefault();
+        take();
         v.currentTime = Math.max(0, v.currentTime - 10);
         break;
       case 'ArrowUp':
-        e.preventDefault();
+        take();
         v.currentTime = Math.min(v.duration || Infinity, v.currentTime + 60);
         break;
       case 'ArrowDown':
-        e.preventDefault();
+        take();
         v.currentTime = Math.max(0, v.currentTime - 60);
         break;
-      case 'n':
-      case 'N':
-        goNext();
-        break;
-      case 'f':
-      case 'F':
-        void (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen());
-        break;
     }
+    parkFocus();
   };
 
   if (error) {
@@ -386,26 +452,30 @@ export function Player() {
   const later = epg.filter((e) => e !== now).slice(0, 2);
 
   return (
-    <div className={`player ${showUi ? 'ui-visible' : ''}`} onMouseMove={poke} onClick={poke}>
+    <div ref={containerRef} className={`player ${showUi ? 'ui-visible' : ''}`} tabIndex={-1} onMouseMove={poke} onClick={poke} onKeyDown={onKey}>
       {meta && (
         <video
-          ref={videoRef}
+          ref={setVideoRef}
           className="video"
-          controls
           autoPlay
           playsInline
-          tabIndex={0}
+          tabIndex={-1}
           onLoadedMetadata={onLoaded}
           onTimeUpdate={onTime}
-          onPause={() => save(true)}
+          onPlay={poke}
+          onPause={() => {
+            save(true);
+            poke();
+          }}
           onSeeked={onSeekedVideo}
           onEnded={onEnded}
           onError={onError}
-          onKeyDown={onKey}
+          onClick={onVideoClick}
+          onDoubleClick={onVideoDoubleClick}
         />
       )}
       <div className="player-top">
-        <button className="btn btn-ghost" onClick={goBack} title="Indietro (Esc)">
+        <button className="btn btn-ghost" data-focus onClick={goBack} title="Indietro (Esc)">
           ‹ Indietro
         </button>
         {meta?.logo && <img className="player-logo" src={meta.logo} alt="" />}
@@ -443,19 +513,25 @@ export function Player() {
           ))}
         </div>
       )}
-      {meta?.next && !nearEnd && (
-        <button className="player-next-icon" onClick={goNext} title={`Prossimo episodio: ${meta.next.label} (N)`} aria-label="Prossimo episodio">
-          <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">
-            <path d="M6 5.5v13l9-6.5-9-6.5zM17 5h2v14h-2z" />
-          </svg>
-        </button>
-      )}
       {meta?.next && nearEnd && (
         <button className="btn btn-primary player-next" onClick={goNext} title="Prossimo episodio (N)">
           <span className="muted small">Prossimo episodio</span>
           <span>{meta.next.label} ▶</span>
         </button>
       )}
+      <PlayerControls
+        video={videoEl}
+        live={isLive}
+        visible={showUi}
+        nowPlaying={isLive ? now?.title : undefined}
+        hasNext={!!meta?.next}
+        nextLabel={meta?.next?.label}
+        onNext={goNext}
+        onPrevChannel={() => goChannel(meta?.prevChannel)}
+        onNextChannel={() => goChannel(meta?.nextChannel)}
+        onInteract={poke}
+        toggleRef={toggleRef}
+      />
     </div>
   );
 }

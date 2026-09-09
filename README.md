@@ -114,6 +114,7 @@ All optional. Set as environment variables.
 | Space | Play / pause |
 | N | Next episode |
 | F | Fullscreen |
+| M | Mute |
 
 ## How it works
 

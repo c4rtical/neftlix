@@ -71,3 +71,91 @@ export const IconSettings = (p: SVGProps<SVGSVGElement>) => (
     <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" />
   </svg>
 );
+
+/* ---- Player controls ---- */
+
+export const IconPlay = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}>
+    <path d="M7.5 4.8v14.4L19 12 7.5 4.8z" fill="currentColor" />
+  </svg>
+);
+
+export const IconPause = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}>
+    <rect x="6.5" y="4.5" width="3.6" height="15" rx="1.2" fill="currentColor" />
+    <rect x="13.9" y="4.5" width="3.6" height="15" rx="1.2" fill="currentColor" />
+  </svg>
+);
+
+export const IconRewind10 = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}>
+    <path d="M11.5 5 8 8l3.5 3" />
+    <path d="M8.5 8H13a6.5 6.5 0 1 1-6.4 7.7" />
+    <text x="12" y="15.6" textAnchor="middle" fontSize="7.5" fontWeight="700" fill="currentColor" stroke="none">
+      10
+    </text>
+  </svg>
+);
+
+export const IconForward10 = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}>
+    <path d="M12.5 5 16 8l-3.5 3" />
+    <path d="M15.5 8H11a6.5 6.5 0 1 0 6.4 7.7" />
+    <text x="12" y="15.6" textAnchor="middle" fontSize="7.5" fontWeight="700" fill="currentColor" stroke="none">
+      10
+    </text>
+  </svg>
+);
+
+export const IconVolume = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}>
+    <path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z" />
+    <path d="M15.8 9.4a3.8 3.8 0 0 1 0 5.2" />
+    <path d="M18.4 7a7.4 7.4 0 0 1 0 10" />
+  </svg>
+);
+
+export const IconVolumeMute = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}>
+    <path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z" />
+    <path d="m16.5 9.8 5 4.4M21.5 9.8l-5 4.4" />
+  </svg>
+);
+
+export const IconNext = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}>
+    <path d="M5.5 5.2v13.6L15 12 5.5 5.2z" fill="currentColor" />
+    <path d="M18.5 5v14" />
+  </svg>
+);
+
+export const IconFullscreen = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}>
+    <path d="M9 4H4v5M15 4h5v5M9 20H4v-5M15 20h5v-5" />
+  </svg>
+);
+
+export const IconExitFullscreen = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}>
+    <path d="M4 9h5V4M20 9h-5V4M4 15h5v5M20 15h-5v5" />
+  </svg>
+);
+
+export const IconTracks = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}>
+    <rect x="3" y="5" width="18" height="14" rx="2" />
+    <path d="M10.2 10.6a2.6 2.6 0 1 0 0 2.8M17.2 10.6a2.6 2.6 0 1 0 0 2.8" />
+  </svg>
+);
+
+export const IconChannelUp = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}>
+    <path d="M12 19V5M5.5 11.5 12 5l6.5 6.5" />
+  </svg>
+);
+
+export const IconChannelDown = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}>
+    <path d="M12 5v14M5.5 12.5 12 19l6.5-6.5" />
+  </svg>
+);
