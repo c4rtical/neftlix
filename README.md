@@ -44,7 +44,7 @@ Grab the latest build from [Releases](https://github.com/c4rtical/neftlix/releas
 
 The app runs the same server described below on your machine (127.0.0.1 only) and keeps its data in your user folder. Your credentials and your video never leave your computer.
 
-Prefer a browser on your TV or phone? Run the server on a PC or NAS instead (next section) and open it from any device on your network.
+Prefer a browser on your TV or phone? Run the server on a PC or NAS instead (see *Quick start* below) and open it from any device on your network.
 
 ## Why
 

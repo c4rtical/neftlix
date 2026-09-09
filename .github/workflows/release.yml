@@ -21,6 +21,8 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - run: npm run check
+      - run: npm test
       - run: npm run release --workspace=desktop
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

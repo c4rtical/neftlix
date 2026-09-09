@@ -1,5 +1,6 @@
 appId: it.neftlix.app
 productName: Neftlix
+# Keep in sync with "electron" in package.json (electron-builder cannot resolve the hoisted range under npm workspaces)
 electronVersion: 44.3.0
 copyright: MIT — c4rtical
 directories:
