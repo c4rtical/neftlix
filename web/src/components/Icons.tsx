@@ -89,9 +89,9 @@ export const IconPause = (p: SVGProps<SVGSVGElement>) => (
 
 export const IconRewind10 = (p: SVGProps<SVGSVGElement>) => (
   <svg {...base(p)}>
-    <path d="M11.5 5 8 8l3.5 3" />
-    <path d="M8.5 8H13a6.5 6.5 0 1 1-6.4 7.7" />
-    <text x="12" y="15.6" textAnchor="middle" fontSize="7.5" fontWeight="700" fill="currentColor" stroke="none">
+    <path d="M1 4v6h6" />
+    <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+    <text x="12" y="12.6" textAnchor="middle" dominantBaseline="central" fontSize="9" fontWeight="700" fill="currentColor" stroke="none">
       10
     </text>
   </svg>
@@ -99,9 +99,9 @@ export const IconRewind10 = (p: SVGProps<SVGSVGElement>) => (
 
 export const IconForward10 = (p: SVGProps<SVGSVGElement>) => (
   <svg {...base(p)}>
-    <path d="M12.5 5 16 8l-3.5 3" />
-    <path d="M15.5 8H11a6.5 6.5 0 1 0 6.4 7.7" />
-    <text x="12" y="15.6" textAnchor="middle" fontSize="7.5" fontWeight="700" fill="currentColor" stroke="none">
+    <path d="M23 4v6h-6" />
+    <path d="M20.49 15a9 9 0 1 1-2.13-9.36L23 10" />
+    <text x="12" y="12.6" textAnchor="middle" dominantBaseline="central" fontSize="9" fontWeight="700" fill="currentColor" stroke="none">
       10
     </text>
   </svg>

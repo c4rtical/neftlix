@@ -3,6 +3,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import Hls from 'hls.js';
 import { api, beaconProgress, formatTime, streamUrl } from '../api';
 import { PlayerControls, restoreVolume } from '../components/PlayerControls';
+import type { PlayerApi } from '../components/PlayerControls';
 import type { EpgItem } from '../types';
 
 type PlayType = 'movie' | 'episode' | 'live';
@@ -31,7 +32,8 @@ export function Player() {
   const nav = useNavigate();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const toggleRef = useRef<(() => void) | null>(null);
+  const apiRef = useRef<PlayerApi | null>(null);
+  const pointerKind = useRef<string>('mouse');
   const clickTimer = useRef<number | null>(null);
   // The controls need the element itself, not a ref: keep it in state so they re-subscribe when it mounts.
   const [videoEl, setVideoEl] = useState<HTMLVideoElement | null>(null);
@@ -219,13 +221,18 @@ export function Player() {
 
   const focusPlay = () => containerRef.current?.querySelector<HTMLElement>('[data-pc="play"]')?.focus();
 
-  // A single click toggles playback, a double click goes fullscreen: hold the first click briefly
-  // so a double click does not also flip play/pause on the way.
+  // Touch: the first tap only brings the bar back, a tap while the bar is up toggles playback.
+  // Mouse: a click always toggles, but is held 200 ms so a double click (fullscreen) does not
+  // flip play/pause on the way.
   const onVideoClick = () => {
+    if (pointerKind.current === 'touch') {
+      if (showUi) apiRef.current?.toggle();
+      return;
+    }
     if (clickTimer.current) window.clearTimeout(clickTimer.current);
     clickTimer.current = window.setTimeout(() => {
       clickTimer.current = null;
-      toggleRef.current?.();
+      apiRef.current?.toggle();
     }, 200);
   };
   const onVideoDoubleClick = () => {
@@ -328,7 +335,7 @@ export function Player() {
       e.stopPropagation();
       if (e.repeat) return; // holding the key must not flicker between play and pause
       poke();
-      toggleRef.current?.();
+      apiRef.current?.toggle();
     };
     const onUp = (e: KeyboardEvent) => {
       if (!videoRef.current || !wants(e)) return;
@@ -361,7 +368,7 @@ export function Player() {
       case 'm':
       case 'M':
         take();
-        v.muted = !v.muted;
+        apiRef.current?.toggleMute();
         return;
       case 'n':
       case 'N':
@@ -405,20 +412,20 @@ export function Player() {
       case 'ArrowRight':
       case 'MediaFastForward':
         take();
-        v.currentTime = Math.min(v.duration || Infinity, v.currentTime + 10);
+        apiRef.current?.seekBy(10);
         break;
       case 'ArrowLeft':
       case 'MediaRewind':
         take();
-        v.currentTime = Math.max(0, v.currentTime - 10);
+        apiRef.current?.seekBy(-10);
         break;
       case 'ArrowUp':
         take();
-        v.currentTime = Math.min(v.duration || Infinity, v.currentTime + 60);
+        apiRef.current?.seekBy(60);
         break;
       case 'ArrowDown':
         take();
-        v.currentTime = Math.max(0, v.currentTime - 60);
+        apiRef.current?.seekBy(-60);
         break;
     }
     parkFocus();
@@ -470,6 +477,9 @@ export function Player() {
           onSeeked={onSeekedVideo}
           onEnded={onEnded}
           onError={onError}
+          onPointerDown={(e) => {
+            pointerKind.current = e.pointerType || 'mouse';
+          }}
           onClick={onVideoClick}
           onDoubleClick={onVideoDoubleClick}
         />
@@ -530,7 +540,7 @@ export function Player() {
         onPrevChannel={() => goChannel(meta?.prevChannel)}
         onNextChannel={() => goChannel(meta?.nextChannel)}
         onInteract={poke}
-        toggleRef={toggleRef}
+        apiRef={apiRef}
       />
     </div>
   );

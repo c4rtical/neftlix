@@ -60,8 +60,15 @@ export type PlayerControlsProps = {
   onNextChannel?: () => void;
   /** Same `poke()` as the page: any interaction keeps the bar on screen. */
   onInteract: () => void;
-  /** Filled with the play/pause toggle so the page can fire it from the video click and Space. */
-  toggleRef?: React.MutableRefObject<(() => void) | null>;
+  /** Filled with the imperative controls so the page's key handling goes through the same code. */
+  apiRef?: React.MutableRefObject<PlayerApi | null>;
+};
+
+/** What `Player.tsx` may drive from its own key/click handlers, so feedback stays identical. */
+export type PlayerApi = {
+  toggle: () => void;
+  toggleMute: () => void;
+  seekBy: (delta: number) => void;
 };
 
 export function PlayerControls({
@@ -75,7 +82,7 @@ export function PlayerControls({
   onPrevChannel,
   onNextChannel,
   onInteract,
-  toggleRef,
+  apiRef,
 }: PlayerControlsProps) {
   const [paused, setPaused] = useState(true);
   const [currentTime, setCurrentTime] = useState(0);
@@ -94,8 +101,11 @@ export function PlayerControls({
     text: [],
     textIndex: -1,
   });
+  const [seekHint, setSeekHint] = useState<{ dir: 1 | -1; amount: number; key: number } | null>(null);
   const barRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const flashTimer = useRef<number | null>(null);
+  const seekTimer = useRef<number | null>(null);
 
   // ---- Video → UI (events only, no polling) ----
   const readTracks = useCallback((v: HTMLVideoElement) => {
@@ -195,9 +205,31 @@ export function PlayerControls({
     if (!visible) setMenu(false);
   }, [visible]);
 
+  // ...and on a click outside it or on Escape (swallowed, so Escape does not also leave the player).
+  useEffect(() => {
+    if (!menu) return;
+    const onPointer = (e: PointerEvent) => {
+      if (!(e.target instanceof Node) || !menuRef.current?.contains(e.target)) setMenu(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      e.preventDefault();
+      e.stopPropagation();
+      setMenu(false);
+      menuRef.current?.querySelector('button')?.focus();
+    };
+    document.addEventListener('pointerdown', onPointer, true);
+    window.addEventListener('keydown', onKey, true);
+    return () => {
+      document.removeEventListener('pointerdown', onPointer, true);
+      window.removeEventListener('keydown', onKey, true);
+    };
+  }, [menu]);
+
   useEffect(
     () => () => {
       if (flashTimer.current) window.clearTimeout(flashTimer.current);
+      if (seekTimer.current) window.clearTimeout(seekTimer.current);
     },
     [],
   );
@@ -212,20 +244,17 @@ export function PlayerControls({
     flashTimer.current = window.setTimeout(() => setFlash(null), 400);
   }, [video, onInteract]);
 
-  useEffect(() => {
-    if (!toggleRef) return;
-    toggleRef.current = toggle;
-    return () => {
-      toggleRef.current = null;
-    };
-  }, [toggle, toggleRef]);
-
   const seekBy = useCallback(
     (delta: number) => {
-      if (!video) return;
+      if (!video || !delta) return;
       onInteract();
       const max = Number.isFinite(video.duration) ? video.duration : Infinity;
       video.currentTime = Math.max(0, Math.min(max, video.currentTime + delta));
+      // Pill on the side we jumped towards; presses that land inside the fade add up.
+      const dir: 1 | -1 = delta > 0 ? 1 : -1;
+      setSeekHint((h) => ({ dir, amount: (h && h.dir === dir ? h.amount : 0) + Math.abs(delta), key: (h?.key ?? 0) + 1 }));
+      if (seekTimer.current) window.clearTimeout(seekTimer.current);
+      seekTimer.current = window.setTimeout(() => setSeekHint(null), 600);
     },
     [video, onInteract],
   );
@@ -242,12 +271,20 @@ export function PlayerControls({
     void (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()).catch(() => {});
   };
 
-  const toggleMute = () => {
+  const toggleMute = useCallback(() => {
     if (!video) return;
     onInteract();
     video.muted = !video.muted;
     if (!video.muted && video.volume === 0) video.volume = 0.5;
-  };
+  }, [video, onInteract]);
+
+  useEffect(() => {
+    if (!apiRef) return;
+    apiRef.current = { toggle, toggleMute, seekBy };
+    return () => {
+      apiRef.current = null;
+    };
+  }, [apiRef, toggle, toggleMute, seekBy]);
 
   const setVol = (val: number) => {
     if (!video) return;
@@ -288,6 +325,16 @@ export function PlayerControls({
     seekBy(dir * step);
   };
 
+  // Only the horizontal arrows belong to the slider: everything else (M, N, F, and ↑/↓ for
+  // spatial navigation out of the bar) must keep bubbling.
+  const onVolKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    const dir = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+    if (!dir || !video) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setVol(Math.max(0, Math.min(1, (video.muted ? 0 : video.volume) + dir * 0.05)));
+  };
+
   const onBarHover = (e: React.MouseEvent<HTMLDivElement>) => {
     const el = barRef.current;
     if (!el || !duration) return;
@@ -301,6 +348,15 @@ export function PlayerControls({
 
   return (
     <>
+      {seekHint && (
+        <div key={seekHint.key} className={`player-seek ${seekHint.dir < 0 ? 'is-back' : 'is-fwd'}`} aria-hidden="true">
+          {seekHint.dir < 0 ? <IconRewind10 /> : <IconForward10 />}
+          <span>
+            {seekHint.dir < 0 ? '−' : '+'}
+            {seekHint.amount} s
+          </span>
+        </div>
+      )}
       {(flash || waiting) && (
         <div className="player-center" aria-hidden="true">
           {waiting ? <span className="player-spinner" /> : <span className="player-flash">{flash === 'play' ? <IconPlay /> : <IconPause />}</span>}
@@ -374,12 +430,12 @@ export function PlayerControls({
               aria-valuetext={`${Math.round((muted ? 0 : volume) * 100)}%`}
               style={{ ['--pc-vol' as string]: `${(muted ? 0 : volume) * 100}%` }}
               onChange={(e) => setVol(Number(e.target.value))}
-              onKeyDown={(e) => e.stopPropagation()}
+              onKeyDown={onVolKey}
             />
           </div>
           <div className="pc-spacer" />
           {hasTracks && (
-            <div className="pc-menu-wrap">
+            <div className="pc-menu-wrap" ref={menuRef}>
               <button
                 className={`pc-btn ${menu ? 'is-on' : ''}`}
                 data-focus

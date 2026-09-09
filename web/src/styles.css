@@ -1172,21 +1172,21 @@ input {
   align-items: center;
 }
 .pc-vol-range {
-  width: 0;
-  opacity: 0;
+  /* Always laid out: a 0x0 control is invisible to spatial navigation (see spatial.ts). */
+  width: 72px;
+  opacity: 0.55;
   height: 22px;
-  margin: 0;
+  margin: 0 8px 0 2px;
   background: transparent;
   cursor: pointer;
-  transition: width 0.2s ease, opacity 0.2s ease, margin 0.2s ease;
+  transition: width 0.2s ease, opacity 0.2s ease;
   -webkit-appearance: none;
   appearance: none;
 }
 .pc-volume:hover .pc-vol-range,
 .pc-volume:focus-within .pc-vol-range {
-  width: 84px;
+  width: 92px;
   opacity: 1;
-  margin: 0 8px 0 2px;
 }
 .pc-vol-range::-webkit-slider-runnable-track {
   height: 4px;
@@ -1263,6 +1263,51 @@ input {
   font-weight: 700;
 }
 
+/* Seek feedback: a pill on the side we jumped towards, like the big players do */
+.player-seek {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 3;
+  animation: player-seek-fade 0.6s ease-out forwards;
+}
+.player-seek.is-back {
+  left: 8%;
+}
+.player-seek.is-fwd {
+  right: 8%;
+}
+.player-seek svg {
+  width: 28px;
+  height: 28px;
+}
+@keyframes player-seek-fade {
+  0% {
+    opacity: 0;
+    transform: translateY(-50%) scale(0.9);
+  }
+  25% {
+    opacity: 1;
+    transform: translateY(-50%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-50%) scale(1);
+  }
+}
+
 /* Centre feedback: play/pause flash and buffering spinner */
 .player-center {
   position: absolute;
@@ -1319,6 +1364,9 @@ input {
   }
   .pc-live-title {
     display: none;
+  }
+  .pc-vol-range {
+    width: 48px;
   }
   .pc-volume:hover .pc-vol-range,
   .pc-volume:focus-within .pc-vol-range {
