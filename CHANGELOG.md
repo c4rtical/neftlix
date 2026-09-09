@@ -10,6 +10,9 @@ All notable changes to this project are documented here. The format follows [Kee
 - "Esci dal profilo" (sign out of the profile on this device) in Settings and on the profile picker.
 - "Log out" from the provider account (Settings and profile picker): the password is removed from the server, the login page comes back with host and username pre-filled, and catalogue, profiles and progress stay.
 
+### Changed
+- README: real screenshots (home, movies, series, sport, profiles), "Support the project" section with crypto addresses and a GitHub Sponsor button; the Italian README was dropped in favour of a single English one.
+
 ### Fixed
 - Sport fixtures: TheSportsDB requests are paced and retried on rate limit; a persistent limit is shown as an error instead of an empty calendar.
 - Bodiless POST/DELETE calls (remove favourite, remove from watchlist, clear progress, sync now, disconnect provider) failed with HTTP 400 because the client always sent a JSON content-type; the header is now sent only with a body.

@@ -13,7 +13,7 @@
   <a href="https://github.com/c4rtical/neftlix/actions/workflows/ci.yml"><img src="https://github.com/c4rtical/neftlix/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="MIT license" /></a>
   <img src="https://img.shields.io/badge/node-%3E%3D23.6-brightgreen" alt="Node 23.6+" />
-  <a href="README.it.md">🇮🇹 Italiano</a>
+  <a href="#support-the-project"><img src="https://img.shields.io/badge/support-crypto-orange.svg" alt="Support the project" /></a>
 </p>
 
 > **Neftlix does not provide any content.** It ships with no channels, playlists, servers or credentials. You connect the Xtream Codes account you already own; what you watch is your provider's responsibility. Neftlix is not affiliated with, endorsed by, or connected to Netflix, Inc.
@@ -22,11 +22,15 @@
 
 <!-- screenshots -->
 <p align="center">
-  <img src="docs/screenshots/home.png" width="800" alt="Home" />
+  <img src="docs/screenshots/home.png" width="800" alt="Home: continue watching, watchlist, recently added, discovery rows" />
 </p>
 <p align="center">
+  <img src="docs/screenshots/movies.png" width="400" alt="Movies with categories, search and sorting" />
   <img src="docs/screenshots/series.png" width="400" alt="Series" />
-  <img src="docs/screenshots/sport.png" width="400" alt="Sport" />
+</p>
+<p align="center">
+  <img src="docs/screenshots/sport.png" width="400" alt="Sport: this week's fixtures matched to the broadcasting channel" />
+  <img src="docs/screenshots/profiles.png" width="400" alt="Who's watching? profile picker" />
 </p>
 
 ## Why
@@ -35,7 +39,7 @@ Classic IPTV players are channel lists with a search box. Neftlix treats your pr
 
 ## Features
 
-- **Connect your provider** with the Xtream Codes credentials you already have. Nothing leaves your machine.
+- **Connect your provider** with the Xtream Codes credentials you already have. Nothing leaves your machine. Log out whenever you want: host and username stay pre-filled, catalogue and progress stay put.
 - **Profiles** — Netflix-style "Who's watching?": up to 5 profiles per installation, each with its own resume positions, favourites and watchlist. Every device remembers its last profile.
 - **Home** built around what you do: resume, new episodes of the series you follow, watchlist, favourites, what's new, discovery rows that rotate daily.
 - **Movies & series** with posters, plot, cast, seasons → episodes, per-category search and sorting.
@@ -124,6 +128,17 @@ See the [issues](https://github.com/c4rtical/neftlix/issues) for what is being w
 ## Contributing
 
 Bug reports with a sample of your panel's JSON are the most valuable thing you can send: every Xtream panel is slightly different. See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Support the project
+
+Neftlix is free and will stay free. If it replaced a paid app for you and you feel like buying me a coffee, crypto is the easiest way:
+
+| Network | Address |
+|---|---|
+| Solana (SOL, USDC) | `SOLANA_ADDRESS_COMING_SOON` |
+| EVM (Ethereum, Base, Arbitrum, Polygon, BNB — ETH, USDC, USDT) | `EVM_ADDRESS_COMING_SOON` |
+
+Stars, bug reports and panel samples help just as much.
 
 ## License
 
