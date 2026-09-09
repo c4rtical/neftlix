@@ -53,11 +53,13 @@ export function Profiles({ current, onDone }: { current: Profile | null; onDone:
     if (!draft) return;
     setBusy(true);
     setError(null);
+    let redirecting = false;
     try {
       if (draft.id === null) {
         const created = await api.createProfile({ name: draft.name, avatar: draft.avatar });
         if ((items?.length ?? 0) === 0) {
           await api.selectProfile(created.id);
+          redirecting = true;
           onDone();
           nav('/');
           return;
@@ -71,7 +73,7 @@ export function Profiles({ current, onDone }: { current: Profile | null; onDone:
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Errore');
     } finally {
-      setBusy(false);
+      if (!redirecting) setBusy(false);
     }
   };
 
@@ -85,7 +87,10 @@ export function Profiles({ current, onDone }: { current: Profile | null; onDone:
       const wasCurrent = current?.id === draft.id;
       setDraft(null);
       await load();
-      if (wasCurrent) onDone();
+      if (wasCurrent) {
+        nav('/profiles', { replace: true });
+        onDone();
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Errore');
     } finally {
