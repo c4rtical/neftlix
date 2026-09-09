@@ -1,12 +1,16 @@
 import { useState, type FormEvent } from 'react';
 import { api } from '../api';
 
-export function Setup({ onDone }: { onDone: () => void }) {
-  const [host, setHost] = useState('');
-  const [username, setUsername] = useState('');
+type LastLogin = { host: string; username: string } | null;
+
+/** First-run provider setup, or the login page after a log out (host and username pre-filled). */
+export function Setup({ lastLogin, onDone }: { lastLogin?: LastLogin; onDone: () => void }) {
+  const [host, setHost] = useState(lastLogin?.host ?? '');
+  const [username, setUsername] = useState(lastLogin?.username ?? '');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const returning = Boolean(lastLogin);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -26,11 +30,15 @@ export function Setup({ onDone }: { onDone: () => void }) {
     <div className="setup">
       <form className="setup-card" onSubmit={submit}>
         <img className="setup-logo" src="/logo.svg" alt="Neftlix" />
-        <h1>Collega il tuo provider</h1>
-        <p className="muted">Inserisci i dati Xtream Codes che ti ha fornito il tuo provider. Restano solo su questo dispositivo.</p>
+        <h1>{returning ? 'Accedi' : 'Collega il tuo provider'}</h1>
+        <p className="muted">
+          {returning
+            ? 'Inserisci la password del tuo provider per rientrare. Catalogo, profili e progressi sono ancora qui.'
+            : 'Inserisci i dati Xtream Codes che ti ha fornito il tuo provider. Restano solo su questo dispositivo.'}
+        </p>
         <label>
           Host / URL
-          <input data-focus value={host} onChange={(e) => setHost(e.target.value)} placeholder="http://esempio.com:8080" autoFocus required />
+          <input data-focus value={host} onChange={(e) => setHost(e.target.value)} placeholder="http://esempio.com:8080" autoFocus={!returning} required />
         </label>
         <label>
           Username
@@ -38,7 +46,7 @@ export function Setup({ onDone }: { onDone: () => void }) {
         </label>
         <label>
           Password
-          <input data-focus type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required />
+          <input data-focus type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" autoFocus={returning} required />
         </label>
         {error && <div className="error">{error}</div>}
         <button className="btn btn-primary" data-focus type="submit" disabled={busy}>

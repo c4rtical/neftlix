@@ -824,6 +824,22 @@ input {
 .btn-danger:hover {
   background: #67161d;
 }
+.link-btn {
+  background: none;
+  border: 0;
+  padding: 6px 10px;
+  border-radius: var(--radius);
+  color: var(--muted);
+  cursor: pointer;
+  text-decoration: underline;
+  font: inherit;
+}
+.link-btn:hover,
+.link-btn:focus {
+  color: var(--fg);
+  outline: none;
+  background: var(--bg-3);
+}
 .profiles-actions,
 .panel-actions {
   display: flex;

@@ -40,7 +40,7 @@ export function Settings({ status, onChanged }: { status: Status; onChanged: () 
   };
 
   const logout = async () => {
-    if (!confirm('Scollegare il provider? Le credenziali Xtream verranno rimosse da questo server; profili, progressi e preferiti restano salvati.')) return;
+    if (!confirm('Uscire dall\'account del provider? La password verrà rimossa da questo server; catalogo, profili, progressi e preferiti restano salvati e potrai rientrare con la sola password.')) return;
     setBusy(true);
     try {
       await api.logout();
@@ -97,10 +97,10 @@ export function Settings({ status, onChanged }: { status: Status; onChanged: () 
         </dl>
         <div className="panel-actions">
           <button className="btn btn-danger" data-focus onClick={logout} disabled={busy}>
-            Scollega provider
+            Log out
           </button>
         </div>
-        <p className="muted small">Rimuove host, username e password del provider da questo server. Per rientrare basterà reinserirli.</p>
+        <p className="muted small">Esce dall'account del provider su questo server. Per rientrare basterà la password: host e username restano compilati.</p>
       </section>
       <section className="panel">
         <h3>Catalogo</h3>

@@ -48,6 +48,21 @@ export function Profiles({ current, onDone }: { current: Profile | null; onDone:
     }
   };
 
+  /** Log out of the provider account: the app goes back to the login page (host and username stay pre-filled). */
+  const logoutAccount = async () => {
+    if (!confirm('Uscire dall\'account del provider? La password verrà rimossa da questo server; catalogo, profili e progressi restano salvati.')) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await api.logout();
+      onDone();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Errore');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   /** Forget the active profile on this device: the picker stays, in select mode. */
   const signOut = async () => {
     setBusy(true);
@@ -205,6 +220,11 @@ export function Profiles({ current, onDone }: { current: Profile | null; onDone:
           </button>
         )}
       </div>
+      {!manage && (
+        <button className="link-btn muted small" data-focus type="button" disabled={busy} onClick={logoutAccount}>
+          Log out dall'account del provider
+        </button>
+      )}
     </div>
   );
 }

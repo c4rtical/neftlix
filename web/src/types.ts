@@ -47,6 +47,8 @@ export type Status = {
   account: { host: string; username: string; status: string; exp_date: number | null; max_connections: number | null; last_sync: number | null } | null;
   profile: Profile | null;
   profiles: number;
+  /** After a log out: host and username of the previous account, to pre-fill the login page. */
+  lastLogin: { host: string; username: string } | null;
   sync: SyncState;
   epg?: { running: boolean; lastRun: number | null; programmes: number; error: string | null };
   fixtures?: { source: string | null; lastRun: number | null; count: number; error: string | null; hasKey: boolean };

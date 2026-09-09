@@ -69,15 +69,28 @@ export function registerApiRoutes(app: FastifyInstance, ctx: Ctx) {
       | { host: string; username: string; status: string; exp_date: number | null; max_connections: number | null; last_sync: number | null }
       | undefined;
 
+  const lastLoginRow = (): { host: string; username: string } | null => {
+    const row = db.prepare(`SELECT value FROM meta WHERE key = 'last_login'`).get() as { value: string } | undefined;
+    if (!row) return null;
+    try {
+      const v = JSON.parse(row.value) as { host?: unknown; username?: unknown };
+      return typeof v.host === 'string' && typeof v.username === 'string' ? { host: v.host, username: v.username } : null;
+    } catch {
+      return null;
+    }
+  };
+
   app.get('/api/status', async (req) => {
     const account = accountRow();
     const counts = {
       movies: (db.prepare('SELECT COUNT(*) AS n FROM movie').get() as { n: number }).n,
       series: (db.prepare('SELECT COUNT(*) AS n FROM series').get() as { n: number }).n,
     };
+    const lastLogin = account ? null : lastLoginRow();
     return {
       configured: Boolean(account),
       account: account ?? null,
+      lastLogin,
       profile: req.profileId === null ? null : (profileRow(db, req.profileId) ?? null),
       profiles: (db.prepare('SELECT COUNT(*) AS n FROM profile').get() as { n: number }).n,
       sync: syncState,
@@ -111,7 +124,12 @@ export function registerApiRoutes(app: FastifyInstance, ctx: Ctx) {
     return { account: accountRow(), sync: syncState };
   });
 
+  // Log out: forget the credentials but remember host and username so the login page can pre-fill them.
   app.delete('/api/setup', async () => {
+    const a = accountRow();
+    if (a) {
+      db.prepare(`INSERT OR REPLACE INTO meta (key, value) VALUES ('last_login', ?)`).run(JSON.stringify({ host: a.host, username: a.username }));
+    }
     db.exec('DELETE FROM account');
     ctx.setClient(null);
     return { ok: true };

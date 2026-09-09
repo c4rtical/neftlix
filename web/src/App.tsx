@@ -53,7 +53,7 @@ export function App() {
 
   if (error) return <div className="page error">Server non raggiungibile: {error}</div>;
   if (!status) return <div className="page muted">Avvio…</div>;
-  if (!status.configured) return <Setup onDone={refresh} />;
+  if (!status.configured) return <Setup lastLogin={status.lastLogin} onDone={refresh} />;
   if (!status.profile) return <Profiles current={null} onDone={refresh} />;
   const profile = status.profile;
 
