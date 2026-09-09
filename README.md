@@ -156,22 +156,13 @@ Neftlix is free and will stay free. If it replaced a paid app for you and you fe
   <a href="https://buymeacoffee.com/neftlix"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" height="60" /></a>
 </p>
 
-Or with crypto — hover an address and use the copy icon on the right:
+Or with crypto:
 
-**BTC**
-```text
-bc1pkmu9ak0v5a2r7p0wpxn006xtqwhuvam4gl39g47n4623phg0f86sgjjzlq
-```
-
-**SOL**
-```text
-7sEvuGqEwQmUDbZTdQYnmJJjvHmda6cnCBMya1Em2sSR
-```
-
-**EVM**
-```text
-0x4e5d74DBC7F46b29F587f573014F8D682446Ff4f
-```
+| Network | Address |
+|---|---|
+| BTC | `bc1pkmu9ak0v5a2r7p0wpxn006xtqwhuvam4gl39g47n4623phg0f86sgjjzlq` |
+| SOL | `7sEvuGqEwQmUDbZTdQYnmJJjvHmda6cnCBMya1Em2sSR` |
+| EVM | `0x4e5d74DBC7F46b29F587f573014F8D682446Ff4f` |
 
 Stars, bug reports and panel samples help just as much.
 
