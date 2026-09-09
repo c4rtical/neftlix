@@ -1,5 +1,6 @@
 appId: it.neftlix.app
 productName: Neftlix
+electronVersion: 44.3.0
 copyright: MIT — c4rtical
 directories:
   output: release

@@ -8,16 +8,19 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 23
+          node-version: 24
           cache: npm
       - run: npm ci
       - run: npm run check
       - run: npm test
       - run: npm run build
+      - run: npm run build --workspace=desktop
       - name: Smoke test server boot
         run: |
           PORT=8799 NEFTLIX_DATA=/tmp/neftlix-ci node --no-warnings=ExperimentalWarning server/src/index.ts &
