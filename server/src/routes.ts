@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { Db } from './db.ts';
 import { now } from './db.ts';
 import { XtreamClient, decodeEpgText } from './xtream.ts';
@@ -29,7 +29,7 @@ export type Card = {
 
 const MOVIE_CARD_SQL = `m.key AS id, m.title, m.year, m.poster, m.rating, m.backdrop,
   p.position AS p_position, p.duration AS p_duration`;
-const MOVIE_CARD_JOIN = `LEFT JOIN progress p ON p.item_type = 'movie' AND p.item_id = m.key`;
+const movieCardJoin = (profileId: number) => `LEFT JOIN progress p ON p.profile_id = ${profileId} AND p.item_type = 'movie' AND p.item_id = m.key`;
 const SERIES_CARD_SQL = `s.id, s.title, s.year, s.poster, s.rating, s.backdrop`;
 
 type MovieRow = { id: string; title: string; year: number | null; poster: string | null; rating: number | null; backdrop: string | null; p_position: number | null; p_duration: number | null };
@@ -57,6 +57,9 @@ function likePattern(q: string): string {
 }
 
 const WATCHED_RATIO = 0.9;
+
+/** Active profile id; the onRequest hook in profiles.ts guarantees it on every non-public /api route. */
+const pid = (req: FastifyRequest) => req.profileId as number;
 
 export function registerApiRoutes(app: FastifyInstance, ctx: Ctx) {
   const { db } = ctx;
@@ -155,7 +158,7 @@ export function registerApiRoutes(app: FastifyInstance, ctx: Ctx) {
     const w = where.length ? `WHERE ${where.join(' AND ')}` : '';
     const total = (db.prepare(`SELECT COUNT(*) AS n FROM movie m ${w}`).get(...(params as never[])) as { n: number }).n;
     const rows = db
-      .prepare(`SELECT ${MOVIE_CARD_SQL} FROM movie m ${MOVIE_CARD_JOIN} ${w} ORDER BY ${order} LIMIT ? OFFSET ?`)
+      .prepare(`SELECT ${MOVIE_CARD_SQL} FROM movie m ${movieCardJoin(pid(req))} ${w} ORDER BY ${order} LIMIT ? OFFSET ?`)
       .all(...(params as never[]), limit, offset) as MovieRow[];
     return { total, items: rows.map(movieCard) };
   });
@@ -170,9 +173,9 @@ export function registerApiRoutes(app: FastifyInstance, ctx: Ctx) {
     const categories = db
       .prepare(`SELECT c.id, c.name FROM movie_category mc JOIN category c ON c.id = mc.category_id AND c.kind = 'movie' WHERE mc.movie_key = ? ORDER BY c.position`)
       .all(key);
-    const progress = db.prepare(`SELECT position, duration, watched FROM progress WHERE item_type = 'movie' AND item_id = ?`).get(key) ?? null;
-    const favorite = Boolean(db.prepare(`SELECT 1 FROM favorite WHERE item_type = 'movie' AND item_id = ?`).get(key));
-    const watchlist = Boolean(db.prepare(`SELECT 1 FROM watchlist WHERE item_type = 'movie' AND item_id = ?`).get(key));
+    const progress = db.prepare(`SELECT position, duration, watched FROM progress WHERE profile_id = ? AND item_type = 'movie' AND item_id = ?`).get(pid(req), key) ?? null;
+    const favorite = Boolean(db.prepare(`SELECT 1 FROM favorite WHERE profile_id = ? AND item_type = 'movie' AND item_id = ?`).get(pid(req), key));
+    const watchlist = Boolean(db.prepare(`SELECT 1 FROM watchlist WHERE profile_id = ? AND item_type = 'movie' AND item_id = ?`).get(pid(req), key));
     return { ...m, id: m.key, sources, categories, progress, favorite, watchlist };
   });
 
@@ -211,9 +214,9 @@ export function registerApiRoutes(app: FastifyInstance, ctx: Ctx) {
     if (!s) return reply.code(404).send({ error: 'Serie non trovata' });
     const episodes = db
       .prepare(`SELECT e.*, p.position AS p_position, p.duration AS p_duration, p.watched AS p_watched
-                FROM episode e LEFT JOIN progress p ON p.item_type = 'episode' AND p.item_id = CAST(e.id AS TEXT)
+                FROM episode e LEFT JOIN progress p ON p.profile_id = ? AND p.item_type = 'episode' AND p.item_id = CAST(e.id AS TEXT)
                 WHERE e.series_id = ? ORDER BY e.season, e.num`)
-      .all(id) as (Record<string, unknown> & { season: number; p_position: number | null; p_duration: number | null; p_watched: number | null })[];
+      .all(pid(req), id) as (Record<string, unknown> & { season: number; p_position: number | null; p_duration: number | null; p_watched: number | null })[];
     const seasons = new Map<number, unknown[]>();
     for (const e of episodes) {
       const { p_position, p_duration, p_watched, ...rest } = e;
@@ -222,15 +225,15 @@ export function registerApiRoutes(app: FastifyInstance, ctx: Ctx) {
       seasons.set(e.season, list);
     }
     const category = db.prepare(`SELECT id, name FROM category WHERE kind = 'series' AND id = ?`).get(String(s.category_id)) ?? null;
-    const favorite = Boolean(db.prepare(`SELECT 1 FROM favorite WHERE item_type = 'series' AND item_id = ?`).get(String(id)));
-    const watchlist = Boolean(db.prepare(`SELECT 1 FROM watchlist WHERE item_type = 'series' AND item_id = ?`).get(String(id)));
+    const favorite = Boolean(db.prepare(`SELECT 1 FROM favorite WHERE profile_id = ? AND item_type = 'series' AND item_id = ?`).get(pid(req), String(id)));
+    const watchlist = Boolean(db.prepare(`SELECT 1 FROM watchlist WHERE profile_id = ? AND item_type = 'series' AND item_id = ?`).get(pid(req), String(id)));
     return {
       ...s,
       id: String(s.id),
       category,
       favorite,
       watchlist,
-      nextEpisode: seriesNextUp(db, id),
+      nextEpisode: seriesNextUp(db, pid(req), id),
       seasons: [...seasons.entries()].sort((a, b) => a[0] - b[0]).map(([season, eps]) => ({ season, episodes: eps })),
     };
   });
@@ -240,7 +243,7 @@ export function registerApiRoutes(app: FastifyInstance, ctx: Ctx) {
     const e = db.prepare('SELECT * FROM episode WHERE id = ?').get(id) as Record<string, unknown> | undefined;
     if (!e) return reply.code(404).send({ error: 'Episodio non trovato' });
     const s = db.prepare('SELECT id, title, poster, backdrop FROM series WHERE id = ?').get(e.series_id as number) as Record<string, unknown>;
-    const progress = db.prepare(`SELECT position, duration, watched FROM progress WHERE item_type = 'episode' AND item_id = ?`).get(String(id)) ?? null;
+    const progress = db.prepare(`SELECT position, duration, watched FROM progress WHERE profile_id = ? AND item_type = 'episode' AND item_id = ?`).get(pid(req), String(id)) ?? null;
     const next = db
       .prepare(`SELECT id, season, num, title FROM episode WHERE series_id = ? AND (season > ? OR (season = ? AND num > ?)) ORDER BY season, num LIMIT 1`)
       .get(e.series_id as number, e.season as number, e.season as number, e.num as number) ?? null;
@@ -252,7 +255,7 @@ export function registerApiRoutes(app: FastifyInstance, ctx: Ctx) {
     if (q.length < 2) return { movies: [], series: [] };
     const pat = likePattern(q);
     const movies = db
-      .prepare(`SELECT ${MOVIE_CARD_SQL} FROM movie m ${MOVIE_CARD_JOIN} WHERE m.title LIKE ?
+      .prepare(`SELECT ${MOVIE_CARD_SQL} FROM movie m ${movieCardJoin(pid(req))} WHERE m.title LIKE ?
                 ORDER BY (m.title LIKE ? COLLATE NOCASE) DESC, m.rating DESC NULLS LAST, m.added DESC LIMIT 40`)
       .all(pat, `${q}%`) as MovieRow[];
     const series = db
@@ -262,23 +265,23 @@ export function registerApiRoutes(app: FastifyInstance, ctx: Ctx) {
     return { movies: movies.map(movieCard), series: series.map(seriesCard) };
   });
 
-  app.get('/api/home', async () => {
+  app.get('/api/home', async (req) => {
     const rows: { key: string; title: string; items: Card[]; link?: string }[] = [];
     const push = (key: string, title: string, items: Card[], link?: string) => {
       if (items.length) rows.push({ key, title, items, link });
     };
 
     // 1. Adesso
-    push('continue', 'Continua a guardare', continueWatching(db));
+    push('continue', 'Continua a guardare', continueWatching(db, pid(req)));
 
     // 2. Per te
-    push('new-episodes', 'Nuovi episodi delle tue serie', seriesWithNewEpisodes(db));
-    push('watchlist', 'Da guardare', watchlistCards(db), '/favorites?tab=watchlist');
-    push('favorites', 'I tuoi preferiti', favoriteCards(db), '/favorites');
+    push('new-episodes', 'Nuovi episodi delle tue serie', seriesWithNewEpisodes(db, pid(req)));
+    push('watchlist', 'Da guardare', watchlistCards(db, pid(req)), '/favorites?tab=watchlist');
+    push('favorites', 'I tuoi preferiti', favoriteCards(db, pid(req)), '/favorites');
 
     // 3. Novità
     const recentMovies = db
-      .prepare(`SELECT ${MOVIE_CARD_SQL} FROM movie m ${MOVIE_CARD_JOIN} WHERE m.poster IS NOT NULL ORDER BY m.added DESC LIMIT 30`)
+      .prepare(`SELECT ${MOVIE_CARD_SQL} FROM movie m ${movieCardJoin(pid(req))} WHERE m.poster IS NOT NULL ORDER BY m.added DESC LIMIT 30`)
       .all() as MovieRow[];
     push('recent-movies', 'Film aggiunti di recente', recentMovies.map(movieCard), '/movies');
     const recentSeries = db.prepare(`SELECT ${SERIES_CARD_SQL} FROM series s WHERE s.poster IS NOT NULL ORDER BY s.last_modified DESC LIMIT 30`).all() as SeriesRow[];
@@ -287,7 +290,7 @@ export function registerApiRoutes(app: FastifyInstance, ctx: Ctx) {
     // 4. Scopri
     const currentYear = new Date().getFullYear();
     const topMovies = db
-      .prepare(`SELECT ${MOVIE_CARD_SQL} FROM movie m ${MOVIE_CARD_JOIN} WHERE m.poster IS NOT NULL AND m.year >= ? AND m.rating >= 6.5
+      .prepare(`SELECT ${MOVIE_CARD_SQL} FROM movie m ${movieCardJoin(pid(req))} WHERE m.poster IS NOT NULL AND m.year >= ? AND m.rating >= 6.5
                 ORDER BY m.rating DESC, m.added DESC LIMIT 30`)
       .all(currentYear - 2) as MovieRow[];
     push('top-movies', 'Film recenti più votati', topMovies.map(movieCard));
@@ -304,7 +307,7 @@ export function registerApiRoutes(app: FastifyInstance, ctx: Ctx) {
     const picked = available.length ? [0, 1, 2].map((i) => available[(dayIndex * 3 + i) % available.length]) : [];
     for (const c of picked) {
       const items = db
-        .prepare(`SELECT ${MOVIE_CARD_SQL} FROM movie m ${MOVIE_CARD_JOIN}
+        .prepare(`SELECT ${MOVIE_CARD_SQL} FROM movie m ${movieCardJoin(pid(req))}
                   WHERE m.poster IS NOT NULL AND m.key IN (SELECT movie_key FROM movie_category WHERE category_id = ?)
                   ORDER BY m.added DESC LIMIT 30`)
         .all(c.id) as MovieRow[];
@@ -325,15 +328,15 @@ export function registerApiRoutes(app: FastifyInstance, ctx: Ctx) {
       if (!e) return reply.code(404).send({ error: 'Episodio non trovato' });
       seriesId = e.series_id;
     }
-    const prev = db.prepare('SELECT watched FROM progress WHERE item_type = ? AND item_id = ?').get(b.type, id) as { watched: number } | undefined;
+    const prev = db.prepare('SELECT watched FROM progress WHERE profile_id = ? AND item_type = ? AND item_id = ?').get(pid(req), b.type, id) as { watched: number } | undefined;
     const watched = prev?.watched === 1 || (duration > 0 && (position / duration >= WATCHED_RATIO || duration - position < 60)) ? 1 : 0;
     db.prepare(`
-      INSERT INTO progress (item_type, item_id, series_id, position, duration, watched, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(item_type, item_id) DO UPDATE SET position = excluded.position, duration = excluded.duration,
+      INSERT INTO progress (profile_id, item_type, item_id, series_id, position, duration, watched, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(profile_id, item_type, item_id) DO UPDATE SET position = excluded.position, duration = excluded.duration,
         watched = excluded.watched, updated_at = excluded.updated_at, series_id = excluded.series_id
-    `).run(b.type, id, seriesId, position, duration, watched, now());
-    if (watched && b.type === 'movie') db.prepare(`DELETE FROM watchlist WHERE item_type = 'movie' AND item_id = ?`).run(id);
+    `).run(pid(req), b.type, id, seriesId, position, duration, watched, now());
+    if (watched && b.type === 'movie') db.prepare(`DELETE FROM watchlist WHERE profile_id = ? AND item_type = 'movie' AND item_id = ?`).run(pid(req), id);
     return { ok: true, watched: Boolean(watched) };
   });
 
@@ -342,7 +345,7 @@ export function registerApiRoutes(app: FastifyInstance, ctx: Ctx) {
     if ((b.type !== 'movie' && b.type !== 'episode') || b.id === undefined) return reply.code(400).send({ error: 'type e id obbligatori' });
     const id = String(b.id);
     if (b.watched === false) {
-      db.prepare('DELETE FROM progress WHERE item_type = ? AND item_id = ?').run(b.type, id);
+      db.prepare('DELETE FROM progress WHERE profile_id = ? AND item_type = ? AND item_id = ?').run(pid(req), b.type, id);
       return { ok: true };
     }
     let seriesId: number | null = null;
@@ -351,17 +354,17 @@ export function registerApiRoutes(app: FastifyInstance, ctx: Ctx) {
       seriesId = e?.series_id ?? null;
     }
     db.prepare(`
-      INSERT INTO progress (item_type, item_id, series_id, position, duration, watched, updated_at)
-      VALUES (?, ?, ?, 0, 0, 1, ?)
-      ON CONFLICT(item_type, item_id) DO UPDATE SET watched = 1, updated_at = excluded.updated_at
-    `).run(b.type, id, seriesId, now());
-    if (b.type === 'movie') db.prepare(`DELETE FROM watchlist WHERE item_type = 'movie' AND item_id = ?`).run(id);
+      INSERT INTO progress (profile_id, item_type, item_id, series_id, position, duration, watched, updated_at)
+      VALUES (?, ?, ?, ?, 0, 0, 1, ?)
+      ON CONFLICT(profile_id, item_type, item_id) DO UPDATE SET watched = 1, updated_at = excluded.updated_at
+    `).run(pid(req), b.type, id, seriesId, now());
+    if (b.type === 'movie') db.prepare(`DELETE FROM watchlist WHERE profile_id = ? AND item_type = 'movie' AND item_id = ?`).run(pid(req), id);
     return { ok: true };
   });
 
   app.delete('/api/progress/:type/:id', async (req) => {
     const p = req.params as { type: string; id: string };
-    db.prepare('DELETE FROM progress WHERE item_type = ? AND item_id = ?').run(p.type, decodeURIComponent(p.id));
+    db.prepare('DELETE FROM progress WHERE profile_id = ? AND item_type = ? AND item_id = ?').run(pid(req), p.type, decodeURIComponent(p.id));
     return { ok: true };
   });
 
@@ -507,50 +510,50 @@ export function registerApiRoutes(app: FastifyInstance, ctx: Ctx) {
     return { ok: true, source: fixtureState.source, error: fixtureState.error, count: fixtureState.count };
   });
 
-  app.get('/api/watchlist', async () => ({ items: watchlistCards(db) }));
+  app.get('/api/watchlist', async (req) => ({ items: watchlistCards(db, pid(req)) }));
 
   app.post('/api/watchlist', async (req, reply) => {
     const b = (req.body ?? {}) as { type?: string; id?: string };
     if ((b.type !== 'movie' && b.type !== 'series') || !b.id) return reply.code(400).send({ error: 'type e id obbligatori' });
-    db.prepare('INSERT OR IGNORE INTO watchlist (item_type, item_id, created_at) VALUES (?, ?, ?)').run(b.type, String(b.id), now());
+    db.prepare('INSERT OR IGNORE INTO watchlist (profile_id, item_type, item_id, created_at) VALUES (?, ?, ?, ?)').run(pid(req), b.type, String(b.id), now());
     return { ok: true, watchlist: true };
   });
 
   app.delete('/api/watchlist/:type/:id', async (req) => {
     const p = req.params as { type: string; id: string };
-    db.prepare('DELETE FROM watchlist WHERE item_type = ? AND item_id = ?').run(p.type, decodeURIComponent(p.id));
+    db.prepare('DELETE FROM watchlist WHERE profile_id = ? AND item_type = ? AND item_id = ?').run(pid(req), p.type, decodeURIComponent(p.id));
     return { ok: true, watchlist: false };
   });
 
-  app.get('/api/favorites', async () => ({ items: favoriteCards(db) }));
+  app.get('/api/favorites', async (req) => ({ items: favoriteCards(db, pid(req)) }));
 
   app.post('/api/favorites', async (req, reply) => {
     const b = (req.body ?? {}) as { type?: string; id?: string };
     if ((b.type !== 'movie' && b.type !== 'series') || !b.id) return reply.code(400).send({ error: 'type e id obbligatori' });
-    db.prepare('INSERT OR IGNORE INTO favorite (item_type, item_id, created_at) VALUES (?, ?, ?)').run(b.type, String(b.id), now());
+    db.prepare('INSERT OR IGNORE INTO favorite (profile_id, item_type, item_id, created_at) VALUES (?, ?, ?, ?)').run(pid(req), b.type, String(b.id), now());
     return { ok: true, favorite: true };
   });
 
   app.delete('/api/favorites/:type/:id', async (req) => {
     const p = req.params as { type: string; id: string };
-    db.prepare('DELETE FROM favorite WHERE item_type = ? AND item_id = ?').run(p.type, decodeURIComponent(p.id));
+    db.prepare('DELETE FROM favorite WHERE profile_id = ? AND item_type = ? AND item_id = ?').run(pid(req), p.type, decodeURIComponent(p.id));
     return { ok: true, favorite: false };
   });
 }
 
 /** Series the user follows (favorite or started) that the provider updated after the user's last activity on them. */
-function seriesWithNewEpisodes(db: Db): Card[] {
+function seriesWithNewEpisodes(db: Db, profileId: number): Card[] {
   const rows = db
     .prepare(`
       SELECT ${SERIES_CARD_SQL}, s.last_modified,
-        (SELECT MAX(p.updated_at) FROM progress p WHERE p.item_type = 'episode' AND p.series_id = s.id) AS last_activity,
-        (SELECT f.created_at FROM favorite f WHERE f.item_type = 'series' AND f.item_id = CAST(s.id AS TEXT)) AS fav_at
+        (SELECT MAX(p.updated_at) FROM progress p WHERE p.profile_id = ? AND p.item_type = 'episode' AND p.series_id = s.id) AS last_activity,
+        (SELECT f.created_at FROM favorite f WHERE f.profile_id = ? AND f.item_type = 'series' AND f.item_id = CAST(s.id AS TEXT)) AS fav_at
       FROM series s
       WHERE (fav_at IS NOT NULL OR last_activity IS NOT NULL)
         AND s.last_modified > COALESCE(last_activity, fav_at)
       ORDER BY s.last_modified DESC LIMIT 20
     `)
-    .all() as (SeriesRow & { last_modified: number })[];
+    .all(profileId, profileId) as (SeriesRow & { last_modified: number })[];
   return rows.map((r) => {
     const card = seriesCard(r);
     card.subtitle = `Aggiornata ${new Date(r.last_modified * 1000).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })}`;
@@ -558,22 +561,22 @@ function seriesWithNewEpisodes(db: Db): Card[] {
   });
 }
 
-function favoriteCards(db: Db): Card[] {
-  return listCards(db, 'favorite');
+function favoriteCards(db: Db, profileId: number): Card[] {
+  return listCards(db, profileId, 'favorite');
 }
 
-function watchlistCards(db: Db): Card[] {
-  return listCards(db, 'watchlist');
+function watchlistCards(db: Db, profileId: number): Card[] {
+  return listCards(db, profileId, 'watchlist');
 }
 
-function listCards(db: Db, table: 'favorite' | 'watchlist'): Card[] {
+function listCards(db: Db, profileId: number, table: 'favorite' | 'watchlist'): Card[] {
   const rows = db
-    .prepare(`SELECT f.item_type, f.item_id, f.created_at FROM ${table} f ORDER BY f.created_at DESC LIMIT 100`)
-    .all() as { item_type: 'movie' | 'series'; item_id: string }[];
+    .prepare(`SELECT f.item_type, f.item_id, f.created_at FROM ${table} f WHERE f.profile_id = ? ORDER BY f.created_at DESC LIMIT 100`)
+    .all(profileId) as { item_type: 'movie' | 'series'; item_id: string }[];
   const out: Card[] = [];
   for (const f of rows) {
     if (f.item_type === 'movie') {
-      const m = db.prepare(`SELECT ${MOVIE_CARD_SQL} FROM movie m ${MOVIE_CARD_JOIN} WHERE m.key = ?`).get(f.item_id) as MovieRow | undefined;
+      const m = db.prepare(`SELECT ${MOVIE_CARD_SQL} FROM movie m ${movieCardJoin(profileId)} WHERE m.key = ?`).get(f.item_id) as MovieRow | undefined;
       if (m) out.push(movieCard(m));
     } else {
       const s = db.prepare(`SELECT ${SERIES_CARD_SQL} FROM series s WHERE s.id = ?`).get(Number(f.item_id)) as SeriesRow | undefined;
@@ -586,33 +589,33 @@ function listCards(db: Db, table: 'favorite' | 'watchlist'): Card[] {
 type NextUp = { episodeId: number; season: number; num: number; title: string | null; position: number; duration: number; image: string | null } | null;
 
 /** The episode a user should play next for a series: in-progress one, else the first unwatched after the last watched. */
-function seriesNextUp(db: Db, seriesId: number): NextUp {
+function seriesNextUp(db: Db, profileId: number, seriesId: number): NextUp {
   const inProgress = db
     .prepare(`
       SELECT e.id, e.season, e.num, e.title, e.image, p.position, p.duration
       FROM progress p JOIN episode e ON e.id = CAST(p.item_id AS INTEGER)
-      WHERE p.item_type = 'episode' AND p.series_id = ? AND p.watched = 0 AND p.position > 0
+      WHERE p.profile_id = ? AND p.item_type = 'episode' AND p.series_id = ? AND p.watched = 0 AND p.position > 0
       ORDER BY p.updated_at DESC LIMIT 1
     `)
-    .get(seriesId) as { id: number; season: number; num: number; title: string | null; image: string | null; position: number; duration: number } | undefined;
+    .get(profileId, seriesId) as { id: number; season: number; num: number; title: string | null; image: string | null; position: number; duration: number } | undefined;
   if (inProgress) return { episodeId: inProgress.id, season: inProgress.season, num: inProgress.num, title: inProgress.title, position: inProgress.position, duration: inProgress.duration, image: inProgress.image };
 
   const lastWatched = db
     .prepare(`
       SELECT e.season, e.num FROM progress p JOIN episode e ON e.id = CAST(p.item_id AS INTEGER)
-      WHERE p.item_type = 'episode' AND p.series_id = ? AND p.watched = 1
+      WHERE p.profile_id = ? AND p.item_type = 'episode' AND p.series_id = ? AND p.watched = 1
       ORDER BY e.season DESC, e.num DESC LIMIT 1
     `)
-    .get(seriesId) as { season: number; num: number } | undefined;
+    .get(profileId, seriesId) as { season: number; num: number } | undefined;
   const next = lastWatched
     ? (db
         .prepare(`
           SELECT e.id, e.season, e.num, e.title, e.image FROM episode e
           WHERE e.series_id = ? AND (e.season > ? OR (e.season = ? AND e.num > ?))
-            AND NOT EXISTS (SELECT 1 FROM progress p WHERE p.item_type = 'episode' AND p.item_id = CAST(e.id AS TEXT) AND p.watched = 1)
+            AND NOT EXISTS (SELECT 1 FROM progress p WHERE p.profile_id = ? AND p.item_type = 'episode' AND p.item_id = CAST(e.id AS TEXT) AND p.watched = 1)
           ORDER BY e.season, e.num LIMIT 1
         `)
-        .get(seriesId, lastWatched.season, lastWatched.season, lastWatched.num) as { id: number; season: number; num: number; title: string | null; image: string | null } | undefined)
+        .get(seriesId, lastWatched.season, lastWatched.season, lastWatched.num, profileId) as { id: number; season: number; num: number; title: string | null; image: string | null } | undefined)
     : (db.prepare('SELECT id, season, num, title, image FROM episode WHERE series_id = ? ORDER BY season, num LIMIT 1').get(seriesId) as
         | { id: number; season: number; num: number; title: string | null; image: string | null }
         | undefined);
@@ -620,26 +623,26 @@ function seriesNextUp(db: Db, seriesId: number): NextUp {
   return { episodeId: next.id, season: next.season, num: next.num, title: next.title, position: 0, duration: 0, image: next.image };
 }
 
-function continueWatching(db: Db): Card[] {
+function continueWatching(db: Db, profileId: number): Card[] {
   const out: Card[] = [];
   const movies = db
     .prepare(`
       SELECT ${MOVIE_CARD_SQL}, p.updated_at AS updated_at FROM progress p JOIN movie m ON m.key = p.item_id
-      WHERE p.item_type = 'movie' AND p.watched = 0 AND p.position > 30
+      WHERE p.profile_id = ? AND p.item_type = 'movie' AND p.watched = 0 AND p.position > 30
       ORDER BY p.updated_at DESC LIMIT 20
     `)
-    .all() as (MovieRow & { updated_at: number })[];
+    .all(profileId) as (MovieRow & { updated_at: number })[];
   const seriesIds = db
     .prepare(`
       SELECT p.series_id, MAX(p.updated_at) AS updated_at FROM progress p
-      WHERE p.item_type = 'episode' AND p.series_id IS NOT NULL
+      WHERE p.profile_id = ? AND p.item_type = 'episode' AND p.series_id IS NOT NULL
       GROUP BY p.series_id ORDER BY updated_at DESC LIMIT 20
     `)
-    .all() as { series_id: number; updated_at: number }[];
+    .all(profileId) as { series_id: number; updated_at: number }[];
 
   const merged: { updated_at: number; card: Card }[] = movies.map((m) => ({ updated_at: m.updated_at, card: movieCard(m) }));
   for (const s of seriesIds) {
-    const next = seriesNextUp(db, s.series_id);
+    const next = seriesNextUp(db, profileId, s.series_id);
     if (!next) continue;
     const row = db.prepare(`SELECT ${SERIES_CARD_SQL} FROM series s WHERE s.id = ?`).get(s.series_id) as SeriesRow | undefined;
     if (!row) continue;
