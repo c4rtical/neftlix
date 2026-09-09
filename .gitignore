@@ -1,0 +1,6 @@
+.env
+local.properties
+node_modules/
+data/
+web/dist/
+.DS_Store
