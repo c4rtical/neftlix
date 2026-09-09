@@ -3,8 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import type { Card, HomeRow, Match, Status } from '../types';
 import { Row } from '../components/Row';
-import { MatchList } from '../components/MatchList';
-import { Link } from 'react-router-dom';
+import { SportStrip } from '../components/SportStrip';
 import { cardHref } from '../components/Card';
 import { focusFirst } from '../spatial';
 
@@ -35,35 +34,24 @@ function Hero({ card }: { card: Card }) {
 export function Home({ status }: { status: Status }) {
   const [rows, setRows] = useState<HomeRow[] | null>(null);
   const [matches, setMatches] = useState<Match[]>([]);
-  const [matchesOpen, setMatchesOpen] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem('home.matchesOpen') === '1';
-    } catch {
-      return false;
-    }
-  });
   const [error, setError] = useState<string | null>(null);
-
-  const toggleMatches = () => {
-    setMatchesOpen((v) => {
-      try {
-        localStorage.setItem('home.matchesOpen', v ? '0' : '1');
-      } catch {
-        /* ignore */
-      }
-      return !v;
-    });
-  };
 
   useEffect(() => {
     let alive = true;
     const load = () =>
       api
-        .liveMatches(2)
-        .then((r) => alive && setMatches(r.items.filter((m) => !m.replay).slice(0, 8)))
+        .liveMatches(1)
+        .then((r) => {
+          if (!alive) return;
+          const at = Math.floor(Date.now() / 1000);
+          // Only what matters right now: live, or kicking off within 3 hours.
+          const soon = r.items.filter((m) => m.channels.length > 0 && m.start >= at - 2 * 3600 && m.start <= at + 3 * 3600);
+          soon.sort((a, b) => Number(b.live) - Number(a.live) || a.start - b.start);
+          setMatches(soon.slice(0, 3));
+        })
         .catch(() => {});
     load();
-    const t = window.setInterval(load, 300_000);
+    const t = window.setInterval(load, 120_000);
     return () => {
       alive = false;
       window.clearInterval(t);
@@ -99,24 +87,7 @@ export function Home({ status }: { status: Status }) {
         </div>
       )}
       {hero && <Hero card={hero} />}
-      {matches.length > 0 && (
-        <section className={`row collapsible ${matchesOpen ? 'open' : ''}`}>
-          <div className="row-head">
-            <button className="collapsible-toggle" data-focus onClick={toggleMatches} aria-expanded={matchesOpen}>
-              <span className="chev">{matchesOpen ? '▾' : '▸'}</span>
-              <h2>Partite in programma</h2>
-              <span className="count-badge">{matches.length}</span>
-              {!matchesOpen && matches.some((m) => m.live) && <span className="epg-badge">In onda</span>}
-            </button>
-            {matchesOpen && (
-              <Link to="/live?tab=matches" className="row-more" data-focus>
-                Tutta la settimana ›
-              </Link>
-            )}
-          </div>
-          {matchesOpen && <MatchList items={matches} compact />}
-        </section>
-      )}
+      {matches.length > 0 && <SportStrip matches={matches} />}
       {rows.map((r) => (
         <Row key={r.key} title={r.title} items={r.items} link={r.link} wide={r.key === 'continue'} />
       ))}

@@ -107,13 +107,22 @@ type MovieGroup = {
   sources: { stream_id: number; ext: string; category_id: string; label: string | null; added: number }[];
 };
 
-function groupMovies(rows: XtreamVodStream[]): Map<string, MovieGroup> {
+/**
+ * `known` maps a normalized "title year" (and bare title) to the TMDB key already stored in the DB.
+ * Panels sometimes omit `tmdb` for rows they returned it for before; without this, the film would
+ * get a new key and lose progress/favorites.
+ */
+function groupMovies(rows: XtreamVodStream[], known: Map<string, string> = new Map()): Map<string, MovieGroup> {
   const groups = new Map<string, MovieGroup>();
   for (const row of rows) {
     if (!row || !row.name || !row.stream_id) continue;
     if (String(row.is_adult) === '1') continue;
     const parsed = parseTitle(row.name);
-    const tmdb = cleanTmdb(row.tmdb ?? row.tmdb_id);
+    let tmdb = cleanTmdb(row.tmdb ?? row.tmdb_id);
+    if (!tmdb) {
+      const k = known.get(normalizeKey(parsed.title, parsed.year)) ?? (parsed.year ? undefined : known.get(normalizeKey(parsed.title, null)));
+      if (k) tmdb = k.slice('tmdb:'.length);
+    }
     const key = tmdb ? `tmdb:${tmdb}` : `name:${normalizeKey(parsed.title, parsed.year)}`;
     const added = toNumber(row.added);
     let g = groups.get(key);
@@ -238,7 +247,17 @@ export async function runSync(db: Db, client: XtreamClient): Promise<void> {
 }
 
 function importMovies(db: Db, rows: XtreamVodStream[]) {
-  const groups = groupMovies(rows);
+  const known = new Map<string, string>();
+  for (const m of db.prepare('SELECT key, title, year FROM movie WHERE tmdb IS NOT NULL').all() as { key: string; title: string; year: number | null }[]) {
+    known.set(normalizeKey(m.title, m.year), m.key);
+    if (m.year && !known.has(normalizeKey(m.title, null))) known.set(normalizeKey(m.title, null), m.key);
+  }
+  const groups = groupMovies(rows, known);
+  let withTmdb = 0;
+  for (const g of groups.values()) if (g.tmdb) withTmdb++;
+  if (known.size && withTmdb < known.size * 0.5) {
+    console.warn(`vod sync: TMDB coverage dropped from ${known.size} to ${withTmdb} films; provider response may be degraded`);
+  }
   syncState.total = groups.size;
   syncState.done = 0;
   db.exec('BEGIN');
@@ -251,7 +270,7 @@ function importMovies(db: Db, rows: XtreamVodStream[]) {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(key) DO UPDATE SET
         title = excluded.title, year = COALESCE(excluded.year, movie.year), poster = COALESCE(excluded.poster, movie.poster),
-        rating = excluded.rating, tmdb = excluded.tmdb, added = excluded.added,
+        rating = COALESCE(excluded.rating, movie.rating), tmdb = COALESCE(excluded.tmdb, movie.tmdb), added = excluded.added,
         stream_id = CASE
           WHEN EXISTS (SELECT 1 FROM movie_source s WHERE s.stream_id = movie.stream_id AND s.broken = 0) THEN movie.stream_id
           ELSE excluded.stream_id END,

@@ -1225,3 +1225,70 @@ input {
     flex-direction: column;
   }
 }
+
+/* Sport strip (home) */
+.sport-strip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 4px 0 14px;
+}
+.sport-strip-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  font-weight: 700;
+}
+.sport-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--bg-3);
+  background: var(--bg-2);
+  color: var(--fg);
+  cursor: pointer;
+  max-width: 100%;
+}
+.sport-chip:hover {
+  background: var(--bg-3);
+}
+.sport-chip.live {
+  border-color: rgba(229, 9, 20, 0.6);
+}
+.sport-chip-time {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+.sport-chip.live .sport-chip-time {
+  color: #fff;
+  background: var(--accent);
+  border-radius: 4px;
+  padding: 1px 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 0.65rem;
+}
+.sport-chip-title {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sport-chip-channel {
+  font-size: 0.75rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+@media (max-width: 640px) {
+  .sport-chip {
+    width: 100%;
+  }
+  .sport-chip-channel {
+    margin-left: auto;
+  }
+}

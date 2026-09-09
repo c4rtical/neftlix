@@ -258,43 +258,50 @@ export function registerApiRoutes(app: FastifyInstance, ctx: Ctx) {
 
   app.get('/api/home', async () => {
     const rows: { key: string; title: string; items: Card[]; link?: string }[] = [];
+    const push = (key: string, title: string, items: Card[], link?: string) => {
+      if (items.length) rows.push({ key, title, items, link });
+    };
 
-    const cont = continueWatching(db);
-    if (cont.length) rows.push({ key: 'continue', title: 'Continua a guardare', items: cont });
+    // 1. Adesso
+    push('continue', 'Continua a guardare', continueWatching(db));
 
-    const favs = favoriteCards(db);
-    if (favs.length) rows.push({ key: 'favorites', title: 'I tuoi preferiti', items: favs, link: '/favorites' });
+    // 2. Per te
+    push('new-episodes', 'Nuovi episodi delle tue serie', seriesWithNewEpisodes(db));
+    push('favorites', 'I tuoi preferiti', favoriteCards(db), '/favorites');
 
+    // 3. Novità
     const recentMovies = db
       .prepare(`SELECT ${MOVIE_CARD_SQL} FROM movie m ${MOVIE_CARD_JOIN} WHERE m.poster IS NOT NULL ORDER BY m.added DESC LIMIT 30`)
       .all() as MovieRow[];
-    rows.push({ key: 'recent-movies', title: 'Film aggiunti di recente', items: recentMovies.map(movieCard), link: '/movies' });
-
+    push('recent-movies', 'Film aggiunti di recente', recentMovies.map(movieCard), '/movies');
     const recentSeries = db.prepare(`SELECT ${SERIES_CARD_SQL} FROM series s WHERE s.poster IS NOT NULL ORDER BY s.last_modified DESC LIMIT 30`).all() as SeriesRow[];
-    rows.push({ key: 'recent-series', title: 'Serie aggiornate di recente', items: recentSeries.map(seriesCard), link: '/series' });
+    push('recent-series', 'Serie aggiornate di recente', recentSeries.map(seriesCard), '/series');
 
+    // 4. Scopri
     const currentYear = new Date().getFullYear();
     const topMovies = db
       .prepare(`SELECT ${MOVIE_CARD_SQL} FROM movie m ${MOVIE_CARD_JOIN} WHERE m.poster IS NOT NULL AND m.year >= ? AND m.rating >= 6.5
                 ORDER BY m.rating DESC, m.added DESC LIMIT 30`)
       .all(currentYear - 2) as MovieRow[];
-    if (topMovies.length) rows.push({ key: 'top-movies', title: 'Film recenti più votati', items: topMovies.map(movieCard) });
-
+    push('top-movies', 'Film recenti più votati', topMovies.map(movieCard));
     const topSeries = db
       .prepare(`SELECT ${SERIES_CARD_SQL} FROM series s WHERE s.poster IS NOT NULL AND s.rating >= 7.5 ORDER BY s.rating DESC, s.last_modified DESC LIMIT 30`)
       .all() as SeriesRow[];
-    if (topSeries.length) rows.push({ key: 'top-series', title: 'Serie più votate', items: topSeries.map(seriesCard) });
+    push('top-series', 'Serie più votate', topSeries.map(seriesCard));
 
-    const preferred = ['Azione', 'Commedia', 'Thriller', 'Animazione', 'Dramma', 'Fantascienza', 'Horror', 'Crime'];
-    const cats = db.prepare(`SELECT id, name FROM category WHERE kind = 'movie' ORDER BY position`).all() as { id: string; name: string }[];
-    const picked = preferred.map((p) => cats.find((c) => c.name.toLowerCase() === p.toLowerCase())).filter(Boolean) as { id: string; name: string }[];
-    for (const c of picked.slice(0, 6)) {
+    // Three genre rows, rotating daily so the home page changes.
+    const preferred = ['Azione', 'Commedia', 'Thriller', 'Animazione', 'Dramma', 'Fantascienza', 'Horror', 'Crime', 'Avventura', 'Fantasy', 'Famiglia', 'Documentario'];
+    const cats = db.prepare(`SELECT id, name FROM category WHERE kind = 'movie' AND hidden = 0 ORDER BY position`).all() as { id: string; name: string }[];
+    const available = preferred.map((p) => cats.find((c) => c.name.toLowerCase() === p.toLowerCase())).filter(Boolean) as { id: string; name: string }[];
+    const dayIndex = Math.floor(Date.now() / 86_400_000);
+    const picked = available.length ? [0, 1, 2].map((i) => available[(dayIndex * 3 + i) % available.length]) : [];
+    for (const c of picked) {
       const items = db
         .prepare(`SELECT ${MOVIE_CARD_SQL} FROM movie m ${MOVIE_CARD_JOIN}
                   WHERE m.poster IS NOT NULL AND m.key IN (SELECT movie_key FROM movie_category WHERE category_id = ?)
                   ORDER BY m.added DESC LIMIT 30`)
         .all(c.id) as MovieRow[];
-      if (items.length) rows.push({ key: `cat-${c.id}`, title: c.name, items: items.map(movieCard), link: `/movies?category=${c.id}` });
+      push(`cat-${c.id}`, c.name, items.map(movieCard), `/movies?category=${c.id}`);
     }
     return { rows };
   });
@@ -501,6 +508,26 @@ export function registerApiRoutes(app: FastifyInstance, ctx: Ctx) {
     const p = req.params as { type: string; id: string };
     db.prepare('DELETE FROM favorite WHERE item_type = ? AND item_id = ?').run(p.type, decodeURIComponent(p.id));
     return { ok: true, favorite: false };
+  });
+}
+
+/** Series the user follows (favorite or started) that the provider updated after the user's last activity on them. */
+function seriesWithNewEpisodes(db: Db): Card[] {
+  const rows = db
+    .prepare(`
+      SELECT ${SERIES_CARD_SQL}, s.last_modified,
+        (SELECT MAX(p.updated_at) FROM progress p WHERE p.item_type = 'episode' AND p.series_id = s.id) AS last_activity,
+        (SELECT f.created_at FROM favorite f WHERE f.item_type = 'series' AND f.item_id = CAST(s.id AS TEXT)) AS fav_at
+      FROM series s
+      WHERE (fav_at IS NOT NULL OR last_activity IS NOT NULL)
+        AND s.last_modified > COALESCE(last_activity, fav_at)
+      ORDER BY s.last_modified DESC LIMIT 20
+    `)
+    .all() as (SeriesRow & { last_modified: number })[];
+  return rows.map((r) => {
+    const card = seriesCard(r);
+    card.subtitle = `Aggiornata ${new Date(r.last_modified * 1000).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })}`;
+    return card;
   });
 }
 
