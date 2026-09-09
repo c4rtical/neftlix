@@ -8,8 +8,10 @@ import { focusFirst } from '../spatial';
 function EpisodeRow({ ep, onWatched }: { ep: Episode; onWatched: (ep: Episode, watched: boolean) => void }) {
   const nav = useNavigate();
   return (
-    <div className={`episode ${ep.watched ? 'watched' : ''}`}>
-      <div className="episode-thumb" data-focus tabIndex={0} onClick={() => nav(`/play/episode/${ep.id}`)} onKeyDown={(e) => e.key === 'Enter' && nav(`/play/episode/${ep.id}`)}>
+    // The whole row opens the episode (Enter via spatial navigation triggers click()); the
+    // "watched" button stops propagation so it doesn't start playback.
+    <div className={`episode ${ep.watched ? 'watched' : ''}`} data-focus tabIndex={0} role="button" onClick={() => nav(`/play/episode/${ep.id}`)}>
+      <div className="episode-thumb">
         {ep.image ? <img src={ep.image} alt="" loading="lazy" /> : <div className="episode-thumb-empty">{ep.num}</div>}
         <span className="episode-play">▶</span>
         <ProgressBar progress={ep.progress} />
@@ -22,7 +24,15 @@ function EpisodeRow({ ep, onWatched }: { ep: Episode; onWatched: (ep: Episode, w
         <div className="muted small">{[formatDuration(ep.duration_secs), ep.air_date].filter(Boolean).join(' · ')}</div>
         {ep.plot && <div className="episode-plot muted">{ep.plot}</div>}
       </div>
-      <button className="btn btn-small" data-focus onClick={() => onWatched(ep, !ep.watched)} title={ep.watched ? 'Segna come non visto' : 'Segna come visto'}>
+      <button
+        className="btn btn-small"
+        data-focus
+        onClick={(e) => {
+          e.stopPropagation();
+          onWatched(ep, !ep.watched);
+        }}
+        title={ep.watched ? 'Segna come non visto' : 'Segna come visto'}
+      >
         {ep.watched ? '✓' : '○'}
       </button>
     </div>

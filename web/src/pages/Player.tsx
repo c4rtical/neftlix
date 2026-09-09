@@ -6,6 +6,9 @@ import type { EpgItem } from '../types';
 
 type PlayType = 'movie' | 'episode' | 'live';
 
+/** Seconds before the end at which the "next episode" toast appears (outro/credits window). */
+const NEXT_TOAST_SECS = 90;
+
 type Meta = {
   type: PlayType;
   id: string | number;
@@ -210,11 +213,23 @@ export function Player() {
     void v.play().catch(() => {});
   };
 
+  // Credits usually run through the last minute and a half: offer the next episode then (N or click).
+  const updateNearEnd = (v: HTMLVideoElement) => {
+    if (Number.isFinite(v.duration) && v.duration > 0) setNearEnd(v.duration - v.currentTime < NEXT_TOAST_SECS);
+  };
+
   const onTime = () => {
     const v = videoRef.current;
     if (!v || isLive) return;
     save();
-    if (Number.isFinite(v.duration) && v.duration > 0) setNearEnd(v.duration - v.currentTime < 45);
+    updateNearEnd(v);
+  };
+
+  const onSeekedVideo = () => {
+    const v = videoRef.current;
+    if (!v) return;
+    save(true);
+    if (!isLive) updateNearEnd(v);
   };
 
   const goBack = () => {
@@ -368,7 +383,7 @@ export function Player() {
           onLoadedMetadata={onLoaded}
           onTimeUpdate={onTime}
           onPause={() => save(true)}
-          onSeeked={() => save(true)}
+          onSeeked={onSeekedVideo}
           onEnded={onEnded}
           onError={onError}
           onKeyDown={onKey}
@@ -384,6 +399,11 @@ export function Player() {
           <div>{meta?.title ?? 'Caricamento…'}</div>
           {meta?.subtitle && <div className="muted small">{meta.subtitle}</div>}
         </div>
+        {meta?.next && (
+          <button className="btn btn-ghost player-next-btn" onClick={goNext} title={`Prossimo episodio: ${meta.next.label} (N)`}>
+            Prossimo episodio ›
+          </button>
+        )}
         {isLive && (
           <div className="player-channel-nav">
             <button className="btn btn-ghost" onClick={() => goChannel(meta?.prevChannel)} title="Canale precedente (↓)">
@@ -415,8 +435,9 @@ export function Player() {
         </div>
       )}
       {meta?.next && nearEnd && (
-        <button className="btn btn-primary player-next" onClick={goNext}>
-          Prossimo: {meta.next.label} ▶
+        <button className="btn btn-primary player-next" onClick={goNext} title="Prossimo episodio (N)">
+          <span className="muted small">Prossimo episodio</span>
+          <span>{meta.next.label} ▶</span>
         </button>
       )}
     </div>

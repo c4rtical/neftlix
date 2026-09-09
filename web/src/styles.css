@@ -545,6 +545,21 @@ input {
   padding: 10px;
   border-radius: var(--radius);
   background: rgba(21, 21, 28, 0.8);
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: background 0.15s, border-color 0.15s;
+}
+.episode:hover,
+.episode:focus {
+  background: var(--bg-3);
+  outline: none;
+}
+.episode:focus {
+  border-color: var(--focus);
+}
+.episode:hover .episode-play,
+.episode:focus .episode-play {
+  opacity: 1;
 }
 .episode.watched {
   opacity: 0.65;
@@ -902,7 +917,33 @@ input {
   position: absolute;
   right: 28px;
   bottom: 90px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 10px 16px;
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.6);
+  animation: player-next-in 0.25s ease-out;
+}
+.player-next .muted {
+  color: #555;
+}
+@keyframes player-next-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.player-next-btn {
+  margin-left: auto;
+  white-space: nowrap;
+}
+.player-channel-nav + .player-next-btn,
+.player-next-btn + .player-channel-nav {
+  margin-left: 0;
 }
 .player-error {
   display: grid;
