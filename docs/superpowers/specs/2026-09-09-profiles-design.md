@@ -137,3 +137,14 @@ Il frontend si verifica a mano nel browser (creazione, selezione, cambio, gestio
 Server: `db.ts`, `profiles.ts` (nuovo), `routes.ts`, `index.ts`, `test/*` (nuovi), `package.json`.
 Web: `Profiles.tsx` (nuovo), `App.tsx`, `Nav.tsx`, `Settings.tsx`, `Search.tsx`, `api.ts`, `types.ts`, `styles.css`.
 Repo: `package.json` (script `test`), `.github/workflows/ci.yml`, `README.md` / `README.it.md` (riga sui profili, checkbox roadmap), `CHANGELOG.md`.
+
+## Note di implementazione
+
+L'implementazione si discosta dal piano su un punto: invece di lasciare invariati gli indici preesistenti su `progress` (`progress_updated ON progress(updated_at DESC)`, `progress_series ON progress(series_id)`) e aggiungerne uno nuovo per `profile_id`, i due indici sono stati sostituiti con le composite con prefisso `profile_id`:
+
+```sql
+CREATE INDEX IF NOT EXISTS progress_updated ON progress(profile_id, updated_at DESC);
+CREATE INDEX IF NOT EXISTS progress_series ON progress(profile_id, series_id);
+```
+
+Motivo: ogni query su `progress` filtra sempre prima per `profile_id` (è multi-profilo per definizione), quindi un indice che non lo include in testa non verrebbe usato efficacemente per quelle letture — SQLite dovrebbe scansionare tutte le righe di tutti i profili per poi filtrare. Le composite `(profile_id, updated_at DESC)` e `(profile_id, series_id)` coprono lo stesso ordinamento/lookup ma ristretto al profilo corrente, senza bisogno di un indice aggiuntivo separato.
