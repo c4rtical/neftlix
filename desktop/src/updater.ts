@@ -93,14 +93,17 @@ export function createUpdater(deps: UpdaterDeps): Updater {
   // per real event.
   if (deps.autoUpdater) {
     const au = deps.autoUpdater;
+    // A check that already timed out fell back to the GitHub API: ignore its late events.
     au.on('update-available', ((info: { version: string }) => {
+      if (!pendingCheck) return;
       setState({ status: 'available', latest: info.version, checkedAt: Date.now() });
-      pendingCheck?.resolve();
+      pendingCheck.resolve();
       pendingCheck = null;
     }) as never);
     au.on('update-not-available', (() => {
+      if (!pendingCheck) return;
       setState({ status: 'up-to-date', checkedAt: Date.now() });
-      pendingCheck?.resolve();
+      pendingCheck.resolve();
       pendingCheck = null;
     }) as never);
     au.on('download-progress', ((p: { percent: number }) => {
@@ -169,7 +172,8 @@ export function createUpdater(deps: UpdaterDeps): Updater {
   }
 
   async function check(): Promise<UpdateState> {
-    if (state.status === 'checking') return state;
+    // Never interrupt a download in flight or discard one already completed.
+    if (state.status === 'checking' || state.status === 'downloading' || state.status === 'downloaded') return state;
     setState({ status: 'checking' });
 
     if (deps.autoUpdater && !manual) {
@@ -211,6 +215,8 @@ export function createUpdater(deps: UpdaterDeps): Updater {
   async function downloadAuto(): Promise<UpdateState> {
     const au = deps.autoUpdater;
     if (!au) return state;
+    // Enter 'downloading' right away so a second click cannot start a second download.
+    setState({ status: 'downloading', progress: 0 });
     try {
       await new Promise<void>((resolve, reject) => {
         const timer = setTimeout(() => {
@@ -258,7 +264,8 @@ export function createUpdater(deps: UpdaterDeps): Updater {
 
     let lastEmit = 0;
     try {
-      const res = await fetch(asset.url, { signal: AbortSignal.timeout(10 * 60 * 1000) });
+      // A universal dmg is ~230 MB: allow slow links before declaring the download stalled.
+      const res = await fetch(asset.url, { signal: AbortSignal.timeout(30 * 60 * 1000) });
       if (!res.ok || !res.body) throw new Error(`download failed: ${res.status}`);
       const total = Number(res.headers.get('content-length') ?? asset.size) || asset.size;
       let received = 0;

@@ -81,7 +81,11 @@ function DesktopUpdatePanel() {
         )}
       </div>
       {state?.status === 'downloaded' && state.manual && (
-        <p className="muted small">Trascina Neftlix nella cartella Applicazioni sostituendo la versione attuale, poi riapri l'app.</p>
+        <p className="muted small">
+          {desktop.platform === 'darwin'
+            ? "Trascina Neftlix nella cartella Applicazioni sostituendo la versione attuale, poi riapri l'app."
+            : "Segui le istruzioni dell'installer, poi riapri l'app."}
+        </p>
       )}
       {state?.releaseUrl && (
         <p className="muted small">
