@@ -25,7 +25,9 @@ export type FixtureState = { source: string | null; lastRun: number | null; coun
 export const fixtureState: FixtureState = { source: null, lastRun: null, count: 0, error: null };
 
 const CACHE_TTL = 3 * 3600;
-let cache: { at: number; items: Fixture[] } | null = null;
+/** After a failed or partial load, try again soon instead of showing a stale/empty calendar for hours. */
+const ERROR_TTL = 5 * 60;
+let cache: { until: number; items: Fixture[] } | null = null;
 
 // ---------- football-data.org (official, free key) ----------
 
@@ -97,13 +99,38 @@ type TsdbEvent = {
   strAwayTeamBadge?: string | null;
 };
 
+/** The free tier rejects bursts with HTTP 429: space requests out and retry once. Tests set both to 0. */
+export const TSDB_PACING = { gapMs: 1500, retryMs: 5000 };
+const TSDB_LIMIT_MSG = 'TheSportsDB: limite richieste del piano gratuito raggiunto. Riprova tra qualche minuto o imposta una chiave football-data.org nelle impostazioni';
+
+class TsdbRateLimited extends Error {}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+let lastTsdbAt = 0;
+
+/** One paced request. Network/HTTP errors yield null (skip the league); a repeated 429 throws TsdbRateLimited. */
 async function tsdb<T>(path: string): Promise<T | null> {
-  try {
-    const res = await fetch(`${TSDB_BASE}/${path}`, { signal: AbortSignal.timeout(20_000) });
+  for (let attempt = 0; ; attempt++) {
+    const wait = lastTsdbAt + TSDB_PACING.gapMs - Date.now();
+    if (wait > 0) await sleep(wait);
+    lastTsdbAt = Date.now();
+    let res: Response;
+    try {
+      res = await fetch(`${TSDB_BASE}/${path}`, { signal: AbortSignal.timeout(20_000) });
+    } catch {
+      return null;
+    }
+    if (res.status === 429) {
+      if (attempt > 0) throw new TsdbRateLimited();
+      await sleep(TSDB_PACING.retryMs);
+      continue;
+    }
     if (!res.ok) return null;
-    return (await res.json()) as T;
-  } catch {
-    return null;
+    try {
+      return (await res.json()) as T;
+    } catch {
+      return null;
+    }
   }
 }
 
@@ -128,23 +155,41 @@ async function fetchTheSportsDb(days: number): Promise<Fixture[]> {
   const from = now() - 86400;
   const to = now() + days * 86400;
   const out: Fixture[] = [];
-  await Promise.all(
-    TSDB_LEAGUES.map(async (league) => {
-      // The next event tells us the current round and season; fetch that round and its neighbours.
+  const seen = new Set<string>();
+  const add = (e: TsdbEvent, league: { code: string; name: string }) => {
+    const f = tsdbToFixture(e, league);
+    if (f && f.start >= from && f.start <= to && !seen.has(f.id)) {
+      seen.add(f.id);
+      out.push(f);
+    }
+  };
+  let rateLimited = false;
+  // Leagues one after another, on purpose: the free tier rejects parallel bursts.
+  for (const league of TSDB_LEAGUES) {
+    try {
       const next = await tsdb<{ events: TsdbEvent[] | null }>(`eventsnextleague.php?id=${league.id}`);
-      const first = next?.events?.[0];
-      if (!first?.intRound || !first.strSeason) return;
-      const round = Number(first.intRound);
-      const rounds = [round - 1, round, round + 1].filter((r) => r >= 1);
-      const lists = await Promise.all(rounds.map((r) => tsdb<{ events: TsdbEvent[] | null }>(`eventsround.php?id=${league.id}&r=${r}&s=${encodeURIComponent(first.strSeason!)}`)));
-      for (const l of lists) {
-        for (const e of l?.events ?? []) {
-          const f = tsdbToFixture(e, league);
-          if (f && f.start >= from && f.start <= to) out.push(f);
-        }
+      const events = next?.events ?? [];
+      for (const e of events) add(e, league);
+      // "Next" is capped at 15 events, so complete every round that starts inside the window.
+      const rounds = new Map<string, { round: string; season: string }>();
+      for (const e of events) {
+        const f = tsdbToFixture(e, league);
+        if (f && f.start <= to && e.intRound && e.strSeason) rounds.set(`${e.strSeason}/${e.intRound}`, { round: e.intRound, season: e.strSeason });
       }
-    }),
-  );
+      for (const r of rounds.values()) {
+        const list = await tsdb<{ events: TsdbEvent[] | null }>(`eventsround.php?id=${league.id}&r=${r.round}&s=${encodeURIComponent(r.season)}`);
+        for (const e of list?.events ?? []) add(e, league);
+      }
+    } catch (e) {
+      if (!(e instanceof TsdbRateLimited)) throw e;
+      rateLimited = true;
+      break;
+    }
+  }
+  if (rateLimited) {
+    if (out.length === 0) throw new Error(TSDB_LIMIT_MSG);
+    fixtureState.error = `${TSDB_LIMIT_MSG} (calendario parziale)`;
+  }
   return out;
 }
 
@@ -162,7 +207,7 @@ export function setFixturesKey(db: Db, key: string | null) {
 }
 
 export async function loadFixtures(db: Db, days = 7, force = false): Promise<Fixture[]> {
-  if (!force && cache && now() - cache.at < CACHE_TTL) return cache.items;
+  if (!force && cache && now() < cache.until) return cache.items;
   const key = getFixturesKey(db);
   let items: Fixture[] = [];
   fixtureState.error = null;
@@ -187,7 +232,7 @@ export async function loadFixtures(db: Db, days = 7, force = false): Promise<Fix
     }
   }
   items.sort((a, b) => a.start - b.start);
-  cache = { at: now(), items };
+  cache = { until: now() + (fixtureState.error ? ERROR_TTL : CACHE_TTL), items };
   fixtureState.lastRun = now();
   fixtureState.count = items.length;
   return items;

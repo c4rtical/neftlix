@@ -38,6 +38,7 @@ export function Live({ mode = 'sport' }: { mode?: 'sport' | 'tv' }) {
   const q = params.get('q') ?? '';
   const [matches, setMatches] = useState<Match[] | null>(null);
   const [matchSource, setMatchSource] = useState<string | null>(null);
+  const [matchError, setMatchError] = useState<string | null>(null);
   const [onlyWithChannel, setOnlyWithChannel] = useState(false);
 
   useEffect(() => {
@@ -48,6 +49,7 @@ export function Live({ mode = 'sport' }: { mode?: 'sport' | 'tv' }) {
       if (!alive) return;
       setMatches(r.items);
       setMatchSource(r.source ?? null);
+      setMatchError(r.error ?? null);
     });
     return () => {
       alive = false;
@@ -140,6 +142,7 @@ export function Live({ mode = 'sport' }: { mode?: 'sport' | 'tv' }) {
         {tab === 'matches' ? (
           <>
             <p className="muted small">Calendario ufficiale{matchSource ? ` (${matchSource})` : ''}, abbinato ai canali tramite la guida TV. Clic sulla partita per guardare.</p>
+            {matchError && <p className="error small">{matchError}</p>}
             <label className="muted small check">
               <input type="checkbox" checked={onlyWithChannel} onChange={(e) => setOnlyWithChannel(e.target.checked)} /> Solo con canale trovato
             </label>
