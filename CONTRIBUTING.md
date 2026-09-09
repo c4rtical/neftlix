@@ -47,7 +47,7 @@ Be kind, be specific, assume good faith. Harassment of any kind is not tolerated
 2. `npm version X.Y.Z --workspaces --include-workspace-root --no-git-tag-version` keeps every package in sync (the desktop build refuses to package on a mismatch).
 
    Bump `electronVersion` in `desktop/electron-builder.yml` whenever `electron` in `desktop/package.json` changes (the pin exists because electron-builder cannot resolve the hoisted range under npm workspaces).
-3. Commit, then `git tag vX.Y.Z && git push origin main vX.Y.Z`.
-4. The *Release* workflow builds the macOS dmg and Windows installer and attaches them to a **draft** release: review it on GitHub, paste the changelog, publish.
+3. Commit and `git push origin main`. No manual tag: the *Release* workflow sees the new version, creates `vX.Y.Z` itself, builds the macOS dmg and Windows installer and attaches them to a **draft** release. Pushes that don't change the version build nothing.
+4. Review the draft on GitHub, paste the changelog, publish.
 
    Publishing the draft is what makes installed apps see the update.

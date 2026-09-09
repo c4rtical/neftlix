@@ -1,14 +1,53 @@
 name: Release
 
+# Runs on every push to main. If package.json carries a version that has no tag yet,
+# the tag vX.Y.Z is created here and the desktop installers are built and attached to a
+# draft GitHub release. Pushing without bumping the version does nothing.
 on:
   push:
+    branches: [main]
     tags: ['v*']
+  workflow_dispatch:
 
 permissions:
   contents: write
 
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      release: ${{ steps.decide.outputs.release }}
+      tag: ${{ steps.decide.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: decide
+        name: Create the version tag when it does not exist yet
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          TAG="v$VERSION"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          if [ "${GITHUB_REF}" = "refs/tags/$TAG" ]; then
+            echo "release=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists: nothing to release."
+            echo "release=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "Neftlix $VERSION"
+          git push origin "$TAG"
+          echo "release=true" >> "$GITHUB_OUTPUT"
+
   desktop:
+    needs: version
+    if: needs.version.outputs.release == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -16,6 +55,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.version.outputs.tag }}
       - uses: actions/setup-node@v4
         with:
           node-version: 24
