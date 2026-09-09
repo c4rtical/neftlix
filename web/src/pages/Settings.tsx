@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '../api';
 import type { Status } from '../types';
 
@@ -47,6 +48,18 @@ export function Settings({ status, onChanged }: { status: Status; onChanged: () 
   return (
     <div className="page page-settings">
       <h2>Impostazioni</h2>
+      <section className="panel">
+        <h3>Profili</h3>
+        <dl>
+          <dt>Profilo attivo</dt>
+          <dd>{status.profile?.name ?? '—'}</dd>
+          <dt>Profili</dt>
+          <dd>{status.profiles} su 5</dd>
+        </dl>
+        <Link className="btn" data-focus to="/profiles?manage=1">
+          Gestisci profili
+        </Link>
+      </section>
       <section className="panel">
         <h3>Provider</h3>
         <dl>

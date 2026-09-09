@@ -1,5 +1,7 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import { IconFilm, IconHeart, IconHome, IconSearch, IconSeries, IconSettings, IconSport, IconTv } from './Icons';
+import { AVATARS, type Profile } from '../types';
+import { initialOf } from '../pages/Profiles';
 
 const items = [
   { to: '/', label: 'Home', icon: <IconHome /> },
@@ -12,9 +14,9 @@ const items = [
   { to: '/settings', label: 'Impostazioni', icon: <IconSettings /> },
 ];
 
-export function Nav() {
+export function Nav({ profile }: { profile: Profile }) {
   const loc = useLocation();
-  if (loc.pathname.startsWith('/play/')) return null;
+  if (loc.pathname.startsWith('/play/') || loc.pathname.startsWith('/profiles')) return null;
   return (
     <nav className="nav">
       <NavLink to="/" className="nav-logo" data-focus title="Home" aria-label="Home">
@@ -26,6 +28,12 @@ export function Nav() {
           <span className="nav-label">{it.label}</span>
         </NavLink>
       ))}
+      <NavLink to="/profiles" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} data-focus title="Cambia profilo">
+        <span className="nav-avatar" style={{ background: AVATARS[profile.avatar] }}>
+          {initialOf(profile.name)}
+        </span>
+        <span className="nav-label">{profile.name}</span>
+      </NavLink>
     </nav>
   );
 }

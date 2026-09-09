@@ -13,6 +13,7 @@ import { Player } from './pages/Player';
 import { Search } from './pages/Search';
 import { Favorites } from './pages/Favorites';
 import { Settings } from './pages/Settings';
+import { Profiles } from './pages/Profiles';
 import { installSpatialNavigation } from './spatial';
 
 export function App() {
@@ -44,13 +45,21 @@ export function App() {
     if (!loc.pathname.startsWith('/play/')) window.scrollTo({ top: 0 });
   }, [loc.pathname]);
 
+  // A deleted profile or an expired cookie: the API answers NO_PROFILE, show the picker again.
+  useEffect(() => {
+    window.addEventListener('neftlix:no-profile', refresh);
+    return () => window.removeEventListener('neftlix:no-profile', refresh);
+  }, [refresh]);
+
   if (error) return <div className="page error">Server non raggiungibile: {error}</div>;
   if (!status) return <div className="page muted">Avvio…</div>;
   if (!status.configured) return <Setup onDone={refresh} />;
+  if (!status.profile) return <Profiles current={null} onDone={refresh} />;
+  const profile = status.profile;
 
   return (
     <div className="app">
-      <Nav />
+      <Nav profile={profile} />
       <main className="main">
         <Routes>
           <Route path="/" element={<Home status={status} />} />
@@ -61,8 +70,9 @@ export function App() {
           <Route path="/movie/:key" element={<MovieDetail />} />
           <Route path="/series/:id" element={<SeriesDetail />} />
           <Route path="/play/:type/:id" element={<Player />} />
-          <Route path="/search" element={<Search />} />
+          <Route path="/search" element={<Search key={profile.id} profileId={profile.id} />} />
           <Route path="/favorites" element={<Favorites />} />
+          <Route path="/profiles" element={<Profiles current={profile} onDone={refresh} />} />
           <Route path="/settings" element={<Settings status={status} onChanged={refresh} />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

@@ -5,12 +5,12 @@ import type { Card } from '../types';
 import { Row } from '../components/Row';
 import { IconSearch } from '../components/Icons';
 
-const HISTORY_KEY = 'search.history';
+const historyKey = (profileId: number) => `search.history.${profileId}`;
 const HISTORY_MAX = 10;
 
-function loadHistory(): string[] {
+function loadHistory(key: string): string[] {
   try {
-    const raw = localStorage.getItem(HISTORY_KEY);
+    const raw = localStorage.getItem(key);
     const list = raw ? (JSON.parse(raw) as unknown) : [];
     return Array.isArray(list) ? list.filter((x): x is string => typeof x === 'string') : [];
   } catch {
@@ -18,21 +18,22 @@ function loadHistory(): string[] {
   }
 }
 
-function saveHistory(list: string[]) {
+function saveHistory(key: string, list: string[]) {
   try {
-    localStorage.setItem(HISTORY_KEY, JSON.stringify(list));
+    localStorage.setItem(key, JSON.stringify(list));
   } catch {
     /* ignore */
   }
 }
 
-export function Search() {
+export function Search({ profileId }: { profileId: number }) {
+  const key = historyKey(profileId);
   const [params, setParams] = useSearchParams();
   const q = params.get('q') ?? '';
   const [input, setInput] = useState(q);
   const [result, setResult] = useState<{ movies: Card[]; series: Card[] } | null>(null);
   const [busy, setBusy] = useState(false);
-  const [history, setHistory] = useState<string[]>(loadHistory);
+  const [history, setHistory] = useState<string[]>(() => loadHistory(key));
 
   useEffect(() => {
     const t = window.setTimeout(() => {
@@ -69,7 +70,7 @@ export function Search() {
   const remember = (term: string) => {
     setHistory((prev) => {
       const next = [term, ...prev.filter((x) => x.toLowerCase() !== term.toLowerCase())].slice(0, HISTORY_MAX);
-      saveHistory(next);
+      saveHistory(key, next);
       return next;
     });
   };
@@ -77,14 +78,14 @@ export function Search() {
   const forget = (term: string) => {
     setHistory((prev) => {
       const next = prev.filter((x) => x !== term);
-      saveHistory(next);
+      saveHistory(key, next);
       return next;
     });
   };
 
   const clearAll = () => {
     setHistory([]);
-    saveHistory([]);
+    saveHistory(key, []);
   };
 
   const showHistory = q.trim().length < 2 && history.length > 0;
