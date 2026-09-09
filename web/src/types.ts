@@ -27,9 +27,26 @@ export type SyncState = {
   error: string | null;
 };
 
+export type Profile = { id: number; name: string; avatar: string };
+
+/** Avatar keys accepted by the server → CSS colour. Order is the picker order. */
+export const AVATARS: Record<string, string> = {
+  red: '#e50914',
+  blue: '#1f6feb',
+  green: '#2ea043',
+  yellow: '#d4a72c',
+  purple: '#8957e5',
+  orange: '#f0883e',
+  teal: '#2aa198',
+  pink: '#e8618c',
+};
+export const AVATAR_KEYS = Object.keys(AVATARS);
+
 export type Status = {
   configured: boolean;
   account: { host: string; username: string; status: string; exp_date: number | null; max_connections: number | null; last_sync: number | null } | null;
+  profile: Profile | null;
+  profiles: number;
   sync: SyncState;
   epg?: { running: boolean; lastRun: number | null; programmes: number; error: string | null };
   fixtures?: { source: string | null; lastRun: number | null; count: number; error: string | null; hasKey: boolean };

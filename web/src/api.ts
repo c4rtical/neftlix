@@ -1,4 +1,4 @@
-import type { Card, Category, EpgItem, EpisodeDetail, HomeRow, LiveChannel, LiveChannelDetail, Match, MovieDetail, SeriesDetail, Status } from './types';
+import type { Card, Category, EpgItem, EpisodeDetail, HomeRow, LiveChannel, LiveChannelDetail, Match, MovieDetail, Profile, SeriesDetail, Status } from './types';
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, {
@@ -8,8 +8,9 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
   if (!res.ok) {
     let msg = `HTTP ${res.status}`;
     try {
-      const body = (await res.json()) as { error?: string };
+      const body = (await res.json()) as { error?: string; code?: string };
       if (body.error) msg = body.error;
+      if (body.code === 'NO_PROFILE') window.dispatchEvent(new Event('neftlix:no-profile'));
     } catch {
       /* ignore */
     }
@@ -29,6 +30,12 @@ export const api = {
   status: () => request<Status>('/api/status'),
   setup: (body: { host: string; username: string; password: string }) => request<{ account: Status['account'] }>('/api/setup', { method: 'POST', body: JSON.stringify(body) }),
   logout: () => request<{ ok: true }>('/api/setup', { method: 'DELETE' }),
+  profiles: () => request<{ items: Profile[]; current: number | null }>('/api/profiles'),
+  createProfile: (body: { name: string; avatar: string }) => request<Profile>('/api/profiles', { method: 'POST', body: JSON.stringify(body) }),
+  updateProfile: (id: number, body: { name?: string; avatar?: string }) => request<Profile>(`/api/profiles/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  deleteProfile: (id: number) => request<{ ok: true }>(`/api/profiles/${id}`, { method: 'DELETE' }),
+  selectProfile: (id: number) => request<Profile>(`/api/profiles/${id}/select`, { method: 'POST' }),
+  deselectProfile: () => request<{ ok: true }>('/api/profiles/deselect', { method: 'POST' }),
   sync: () => request<{ sync: Status['sync'] }>('/api/sync', { method: 'POST' }),
   home: () => request<{ rows: HomeRow[] }>('/api/home'),
   categories: (kind: 'movie' | 'series') => request<Category[]>(`/api/categories${qs({ kind })}`),
