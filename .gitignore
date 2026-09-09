@@ -4,3 +4,4 @@ node_modules/
 data/
 web/dist/
 .DS_Store
+.superpowers/
