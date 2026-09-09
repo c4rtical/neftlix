@@ -1,0 +1,34 @@
+appId: it.neftlix.app
+productName: Neftlix
+copyright: MIT — c4rtical
+directories:
+  output: release
+  buildResources: build
+files:
+  - dist/**/*
+  - package.json
+asar: true
+asarUnpack:
+  - dist/web/**
+npmRebuild: false
+mac:
+  category: public.app-category.entertainment
+  target:
+    - target: dmg
+      arch: [universal]
+  identity: null
+  hardenedRuntime: false
+  gatekeeperAssess: false
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  perMachine: false
+publish:
+  provider: github
+  owner: c4rtical
+  repo: neftlix
+  releaseType: draft

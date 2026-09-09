@@ -5,7 +5,8 @@
   "type": "module",
   "workspaces": [
     "server",
-    "web"
+    "web",
+    "desktop"
   ],
   "scripts": {
     "dev": "npm run dev --workspace=server & npm run dev --workspace=web & wait",
@@ -13,8 +14,10 @@
     "dev:web": "npm run dev --workspace=web",
     "build": "npm run build --workspace=web",
     "start": "npm run build && npm run start --workspace=server",
-    "check": "npm run check --workspace=server && npm run check --workspace=web",
-    "test": "npm run test --workspace=server"
+    "check": "npm run check --workspace=server && npm run check --workspace=web && npm run check --workspace=desktop",
+    "test": "npm run test --workspace=server",
+    "desktop": "npm run dev --workspace=desktop",
+    "desktop:dist": "npm run dist --workspace=desktop"
   },
   "engines": {
     "node": ">=23.6"

@@ -4,5 +4,7 @@ node_modules/
 data/
 web/dist/
 server/dist/
+desktop/dist/
+desktop/release/
 .DS_Store
 .superpowers/

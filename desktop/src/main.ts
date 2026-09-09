@@ -1,0 +1,143 @@
+import { app, BrowserWindow, dialog, Menu, shell, type MenuItemConstructorOptions } from 'electron';
+import { appendFileSync, mkdirSync } from 'node:fs';
+import { join } from 'node:path';
+import { startServer, type RunningServer } from './server.js';
+import { loadWindowState, trackWindowState } from './window-state.js';
+
+const REPO = 'https://github.com/c4rtical/neftlix';
+const DEBUG = process.env.NEFTLIX_DEBUG === '1';
+
+let server: RunningServer | null = null;
+let win: BrowserWindow | null = null;
+
+function log(line: string) {
+  const msg = `${new Date().toISOString()} ${line}`;
+  console.log(msg);
+  try {
+    appendFileSync(join(app.getPath('userData'), 'neftlix.log'), `${msg}\n`);
+  } catch {
+    /* ignore */
+  }
+}
+
+function buildMenu(dataDir: string) {
+  const isMac = process.platform === 'darwin';
+  const help: MenuItemConstructorOptions = {
+    role: 'help',
+    label: 'Aiuto',
+    submenu: [
+      { label: 'Neftlix su GitHub', click: () => void shell.openExternal(REPO) },
+      { label: 'Segnala un problema', click: () => void shell.openExternal(`${REPO}/issues/new/choose`) },
+      { label: 'Apri la cartella dei dati', click: () => void shell.openPath(dataDir) },
+      { type: 'separator' },
+      { label: `Versione ${app.getVersion()}`, enabled: false },
+    ],
+  };
+  const template: MenuItemConstructorOptions[] = [
+    ...(isMac ? [{ role: 'appMenu' as const, label: 'Neftlix' }] : []),
+    { role: 'editMenu', label: 'Modifica' },
+    {
+      label: 'Visualizza',
+      submenu: [
+        { role: 'reload', label: 'Ricarica' },
+        { role: 'togglefullscreen', label: 'Schermo intero' },
+        { type: 'separator' },
+        { role: 'resetZoom', label: 'Zoom normale' },
+        { role: 'zoomIn', label: 'Ingrandisci' },
+        { role: 'zoomOut', label: 'Riduci' },
+        ...(DEBUG ? [{ type: 'separator' as const }, { role: 'toggleDevTools' as const }] : []),
+      ],
+    },
+    { role: 'windowMenu', label: 'Finestra' },
+    help,
+  ];
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+}
+
+function createWindow(url: string) {
+  const userData = app.getPath('userData');
+  const state = loadWindowState(userData);
+  win = new BrowserWindow({
+    x: state.x,
+    y: state.y,
+    width: state.width,
+    height: state.height,
+    minWidth: 960,
+    minHeight: 600,
+    title: 'Neftlix',
+    backgroundColor: '#0b0b0f',
+    autoHideMenuBar: process.platform !== 'darwin',
+    show: false,
+    webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true },
+  });
+  if (state.maximized) win.maximize();
+  trackWindowState(win, userData);
+
+  // Everything outside the local server opens in the system browser.
+  const origin = new URL(url).origin;
+  win.webContents.setWindowOpenHandler(({ url: target }) => {
+    void shell.openExternal(target);
+    return { action: 'deny' };
+  });
+  win.webContents.on('will-navigate', (event, target) => {
+    if (!target.startsWith(origin)) {
+      event.preventDefault();
+      void shell.openExternal(target);
+    }
+  });
+
+  win.once('ready-to-show', () => win?.show());
+  win.on('closed', () => {
+    win = null;
+  });
+  void win.loadURL(url);
+}
+
+async function boot() {
+  const userData = app.getPath('userData');
+  const dataDir = join(userData, 'data');
+  mkdirSync(dataDir, { recursive: true });
+  const webDist = join(import.meta.dirname, 'web');
+  log(`Neftlix ${app.getVersion()} starting; data: ${dataDir}`);
+  try {
+    server = await startServer(dataDir, webDist, DEBUG);
+    log(`server on ${server.url}`);
+  } catch (e) {
+    const msg = e instanceof Error ? (e.stack ?? e.message) : String(e);
+    log(`server failed: ${msg}`);
+    dialog.showErrorBox('Neftlix non riesce ad avviarsi', `${msg}\n\nLog: ${join(userData, 'neftlix.log')}`);
+    app.quit();
+    return;
+  }
+  buildMenu(dataDir);
+  createWindow(server.url);
+}
+
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (!win) return;
+    if (win.isMinimized()) win.restore();
+    win.focus();
+  });
+
+  app.whenReady().then(boot);
+
+  app.on('activate', () => {
+    // macOS: clicking the Dock icon with no window open re-creates it.
+    if (BrowserWindow.getAllWindows().length === 0 && server) createWindow(server.url);
+  });
+
+  app.on('window-all-closed', () => {
+    if (process.platform !== 'darwin') app.quit();
+  });
+
+  app.on('before-quit', () => {
+    if (server) {
+      const s = server;
+      server = null;
+      void s.close().catch(() => {});
+    }
+  });
+}

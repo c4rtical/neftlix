@@ -1,0 +1,31 @@
+{
+  "name": "@neftlix/desktop",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Neftlix desktop app",
+  "type": "module",
+  "main": "dist/main.js",
+  "productName": "Neftlix",
+  "author": "c4rtical",
+  "license": "MIT",
+  "scripts": {
+    "build:server": "cd .. && npm run build --workspace=server",
+    "build:web": "cd .. && npm run build --workspace=web",
+    "build:main": "tsc -p .",
+    "prepare:dist": "node scripts/prepare.mjs",
+    "build": "npm run build:server && npm run build:web && npm run build:main && npm run prepare:dist",
+    "check": "tsc --noEmit -p .",
+    "dev": "npm run build && electron .",
+    "dist": "npm run build && electron-builder --publish never",
+    "release": "npm run build && electron-builder --publish always"
+  },
+  "dependencies": {
+    "@fastify/static": "^8.0.0",
+    "fastify": "^5.0.0"
+  },
+  "devDependencies": {
+    "electron": "^44.3.0",
+    "electron-builder": "^26.0.0",
+    "typescript": "^5.8.0"
+  }
+}
