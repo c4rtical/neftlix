@@ -7,7 +7,7 @@ import { now } from './db.ts';
 
 export type Fixture = {
   id: string;
-  source: 'football-data' | 'thesportsdb';
+  source: 'football-data' | 'thesportsdb' | 'espn';
   competition: string;
   competitionCode: string;
   home: string;
@@ -194,6 +194,93 @@ async function fetchTheSportsDb(days: number): Promise<Fixture[]> {
   return out;
 }
 
+// ---------- ESPN (keyless fallback: unofficial public scoreboard, fast and generous) ----------
+
+const ESPN_BASE = 'https://site.api.espn.com/apis/site/v2/sports/soccer';
+const ESPN_LEAGUES: { slug: string; code: string; name: string }[] = [
+  { slug: 'ita.1', code: 'SA', name: 'Serie A' },
+  { slug: 'ita.coppa_italia', code: 'CI', name: 'Coppa Italia' },
+  { slug: 'uefa.champions', code: 'CL', name: 'UEFA Champions League' },
+  { slug: 'uefa.europa', code: 'EL', name: 'UEFA Europa League' },
+  { slug: 'eng.1', code: 'PL', name: 'Premier League' },
+  { slug: 'esp.1', code: 'PD', name: 'La Liga' },
+  { slug: 'ger.1', code: 'BL1', name: 'Bundesliga' },
+  { slug: 'fra.1', code: 'FL1', name: 'Ligue 1' },
+];
+
+type EspnEvent = {
+  id: string;
+  date: string;
+  status?: { type?: { name?: string; state?: string } };
+  competitions?: { competitors?: { homeAway?: string; team?: { displayName?: string; logo?: string } }[] }[];
+};
+
+function espnStatus(type: { name?: string; state?: string } | undefined): string {
+  const name = type?.name ?? '';
+  if (name.includes('POSTPONED')) return 'POSTPONED';
+  if (name.includes('CANCEL')) return 'CANCELLED';
+  if (type?.state === 'in') return 'IN_PLAY';
+  if (type?.state === 'post') return 'FINISHED';
+  return 'SCHEDULED';
+}
+
+function espnToFixture(e: EspnEvent, league: { code: string; name: string }): Fixture | null {
+  const ts = Date.parse(e.date);
+  const competitors = e.competitions?.[0]?.competitors ?? [];
+  const home = competitors.find((c) => c.homeAway === 'home')?.team;
+  const away = competitors.find((c) => c.homeAway === 'away')?.team;
+  if (!Number.isFinite(ts) || !home?.displayName || !away?.displayName) return null;
+  return {
+    id: `espn:${e.id}`,
+    source: 'espn',
+    competition: league.name,
+    competitionCode: league.code,
+    home: home.displayName,
+    away: away.displayName,
+    start: Math.floor(ts / 1000),
+    status: espnStatus(e.status?.type),
+    homeCrest: home.logo ?? null,
+    awayCrest: away.logo ?? null,
+  };
+}
+
+async function fetchEspn(days: number): Promise<Fixture[]> {
+  const ymd = (d: Date) => d.toISOString().slice(0, 10).replace(/-/g, '');
+  const from = new Date(Date.now() - 86400_000);
+  const to = new Date(Date.now() + days * 86400_000);
+  const results = await Promise.allSettled(
+    ESPN_LEAGUES.map(async (league) => {
+      const res = await fetch(`${ESPN_BASE}/${league.slug}/scoreboard?dates=${ymd(from)}-${ymd(to)}&limit=200`, { signal: AbortSignal.timeout(20_000) });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = (await res.json()) as { events?: EspnEvent[] };
+      return (data.events ?? []).map((e) => espnToFixture(e, league)).filter((f): f is Fixture => f !== null);
+    }),
+  );
+  const ok = results.filter((r): r is PromiseFulfilledResult<Fixture[]> => r.status === 'fulfilled');
+  if (ok.length === 0) {
+    const first = results.find((r): r is PromiseRejectedResult => r.status === 'rejected');
+    throw new Error(`ESPN non raggiungibile (${first?.reason instanceof Error ? first.reason.message : 'errore'})`);
+  }
+  return ok.flatMap((r) => r.value);
+}
+
+/** Keyless chain: TheSportsDB first (official free tier), ESPN when it fails or has nothing. */
+async function fetchKeyless(days: number): Promise<{ items: Fixture[]; source: string }> {
+  let tsdbError: string | null = null;
+  try {
+    const items = await fetchTheSportsDb(days);
+    if (items.length > 0) return { items, source: 'TheSportsDB (senza chiave)' };
+  } catch (e) {
+    tsdbError = e instanceof Error ? e.message : String(e);
+  }
+  try {
+    return { items: await fetchEspn(days), source: 'ESPN (senza chiave)' };
+  } catch (e) {
+    const espnError = e instanceof Error ? e.message : String(e);
+    throw new Error(tsdbError ? `${tsdbError} · ${espnError}` : espnError);
+  }
+}
+
 // ---------- Public API ----------
 
 export function getFixturesKey(db: Db): string | null {
@@ -221,23 +308,25 @@ export async function loadFixtures(db: Db, days = 7, force = false): Promise<Fix
         items = await fetchFootballData(key, days);
         fixtureState.source = 'football-data.org';
       } else {
-        items = await fetchTheSportsDb(days);
-        fixtureState.source = 'TheSportsDB (senza chiave)';
+        const r = await fetchKeyless(days);
+        items = r.items;
+        fixtureState.source = r.source;
       }
     } catch (e) {
       const keyError = e instanceof Error ? e.message : String(e);
       fixtureState.error = keyError;
       if (key) {
-        // Key problem: fall back so the page still works.
+        // Key problem: fall back to the keyless chain so the page still works.
         try {
-          items = await fetchTheSportsDb(days);
-          fixtureState.source = 'TheSportsDB (fallback)';
+          const r = await fetchKeyless(days);
+          items = r.items;
+          fixtureState.source = `${r.source.replace(' (senza chiave)', '')} (fallback)`;
           // fetchTheSportsDb may have overwritten fixtureState.error with a partial-calendar
           // message; keep the key error too, so the user still sees why the key failed.
           const partial = fixtureState.error !== keyError ? fixtureState.error : null;
           fixtureState.error = `${keyError}${partial ? ` · ${partial}` : ''}`;
-        } catch {
-          /* keep error */
+        } catch (fallbackErr) {
+          fixtureState.error = `${keyError} · ${fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr)}`;
         }
       }
     }

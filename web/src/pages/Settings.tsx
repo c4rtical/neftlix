@@ -131,8 +131,9 @@ export function Settings({ status, onChanged }: { status: Status; onChanged: () 
           <dd>{status.epg?.programmes ? `${status.epg.programmes.toLocaleString('it-IT')} programmi, aggiornata ${fmtDate(status.epg.lastRun)}` : 'non disponibile'}</dd>
         </dl>
         <p className="muted small">
-          Senza chiave vengono usati i dati gratuiti di TheSportsDB (Serie A, Champions, Europa League, Premier, Liga, Bundesliga, Ligue 1). Con una chiave gratuita di
-          football-data.org (registrazione su football-data.org/client/register) il calendario è più completo e aggiornato.
+          Senza chiave vengono usati i dati gratuiti di TheSportsDB, con ESPN come riserva se TheSportsDB non risponde (Serie A, Coppa Italia, Champions, Europa League,
+          Premier, Liga, Bundesliga, Ligue 1). Con una chiave gratuita di football-data.org (registrazione su football-data.org/client/register) il calendario è più
+          completo e aggiornato.
         </p>
         <div className="keyrow">
           <input data-focus type="password" placeholder={fx?.hasKey ? 'Chiave impostata: incolla per sostituire, vuoto per rimuovere' : 'Chiave API football-data.org'} value={fdKey} onChange={(e) => setFdKey(e.target.value)} />

@@ -8,6 +8,7 @@ All notable changes to this project are documented here. The format follows [Kee
 - Profiles: "Who's watching?" screen, up to 5 profiles with separate progress, favourites and watchlist; avatar in the navigation to switch; existing data migrates to a "Principale" profile.
 - Server test suite (`npm test`, `node:test`) covering migration and profile isolation.
 - "Esci dal profilo" (sign out of the profile on this device) in Settings and on the profile picker.
+- Sport fixtures: ESPN's public scoreboard as a keyless fallback when TheSportsDB is rate-limited or empty (Serie A, Coppa Italia, Champions, Europa League, Premier, Liga, Bundesliga, Ligue 1).
 - "Log out" from the provider account (Settings and profile picker): the password is removed from the server, the login page comes back with host and username pre-filled, and catalogue, profiles and progress stay.
 
 ### Changed

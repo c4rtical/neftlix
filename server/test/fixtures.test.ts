@@ -108,3 +108,79 @@ test('fetches every round inside the window, sequentially, without duplicates', 
   assert.equal(f.max(), 1, 'requests must not overlap');
   assert.equal(f.calls.filter((u) => u.includes('r=9')).length, 0, 'rounds outside the window are not fetched');
 });
+
+const espnEvent = (id: string, hours: number, state: 'pre' | 'in' | 'post', name = 'STATUS_SCHEDULED', home = 'Napoli', away = 'AC Milan') => ({
+  id,
+  date: new Date(Date.now() + hours * 3600_000).toISOString(),
+  status: { type: { name, state } },
+  competitions: [
+    {
+      competitors: [
+        { homeAway: 'home', team: { displayName: home, logo: 'https://a.espncdn.com/h.png' } },
+        { homeAway: 'away', team: { displayName: away, logo: 'https://a.espncdn.com/a.png' } },
+      ],
+    },
+  ],
+});
+
+test('falls back to ESPN when TheSportsDB is rate-limited, mapping statuses and leagues', async () => {
+  const f = fakeFetch((url) => {
+    if (url.includes('thesportsdb.com')) return { status: 429 };
+    if (url.includes('espn.com') && url.includes('/ita.1/')) {
+      return {
+        status: 200,
+        body: {
+          events: [
+            espnEvent('1', 5, 'pre'),
+            espnEvent('2', -1, 'in', 'STATUS_SECOND_HALF', 'Inter', 'Juventus'),
+            espnEvent('3', -3, 'post', 'STATUS_FULL_TIME', 'Roma', 'Lazio'),
+            espnEvent('4', 30, 'pre', 'STATUS_POSTPONED', 'Genoa', 'Pisa'),
+          ],
+        },
+      };
+    }
+    if (url.includes('espn.com') && url.includes('/uefa.champions/')) return { status: 200, body: { events: [espnEvent('5', 8, 'pre', 'STATUS_SCHEDULED', 'Barcelona', 'Feyenoord Rotterdam')] } };
+    if (url.includes('espn.com')) return { status: 200, body: { events: [] } };
+    return { status: 404 };
+  });
+  const items = await loadFixtures(openDb(':memory:'), 7, true);
+  assert.deepEqual(
+    items.map((i) => [i.id, i.competitionCode, i.status]),
+    [
+      ['espn:3', 'SA', 'FINISHED'],
+      ['espn:2', 'SA', 'IN_PLAY'],
+      ['espn:1', 'SA', 'SCHEDULED'],
+      ['espn:5', 'CL', 'SCHEDULED'],
+      ['espn:4', 'SA', 'POSTPONED'],
+    ],
+  );
+  const first = items.find((i) => i.id === 'espn:1')!;
+  assert.equal(first.source, 'espn');
+  assert.equal(first.home, 'Napoli');
+  assert.equal(first.away, 'AC Milan');
+  assert.equal(first.competition, 'Serie A');
+  assert.equal(first.homeCrest, 'https://a.espncdn.com/h.png');
+  assert.match(fixtureState.source ?? '', /ESPN/);
+  assert.equal(fixtureState.error, null);
+  assert.equal(f.calls.filter((u) => u.includes('espn.com')).length, 8, 'one scoreboard request per league');
+});
+
+test('uses ESPN when TheSportsDB answers but has no events', async () => {
+  fakeFetch((url) => {
+    if (url.includes('thesportsdb.com')) return { status: 200, body: { events: null } };
+    if (url.includes('espn.com') && url.includes('/eng.1/')) return { status: 200, body: { events: [espnEvent('9', 4, 'pre', 'STATUS_SCHEDULED', 'Arsenal', 'Chelsea')] } };
+    if (url.includes('espn.com')) return { status: 200, body: { events: [] } };
+    return { status: 404 };
+  });
+  const items = await loadFixtures(openDb(':memory:'), 7, true);
+  assert.deepEqual(items.map((i) => [i.id, i.competitionCode]), [['espn:9', 'PL']]);
+  assert.match(fixtureState.source ?? '', /ESPN/);
+});
+
+test('reports both sources when TheSportsDB and ESPN fail', async () => {
+  fakeFetch((url) => (url.includes('espn.com') ? { status: 503 } : { status: 429 }));
+  const items = await loadFixtures(openDb(':memory:'), 7, true);
+  assert.deepEqual(items, []);
+  assert.match(fixtureState.error ?? '', /limite richieste/);
+  assert.match(fixtureState.error ?? '', /ESPN/);
+});
