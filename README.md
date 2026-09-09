@@ -105,7 +105,7 @@ All optional. Set as environment variables.
 |---|---|
 | Arrows | Move focus |
 | Enter | Open / play |
-| Esc, Backspace | Back |
+| Esc, Backspace | Close the player or the detail page (does nothing in the main sections) |
 | In the player: ← → | Seek ±10 s |
 | In the player: ↑ ↓ | Seek ±60 s (live: next / previous channel) |
 | Space | Play / pause |

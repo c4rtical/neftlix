@@ -38,7 +38,20 @@ export function App() {
     return () => window.clearInterval(t);
   }, [status?.sync.running, refresh]);
 
-  useEffect(() => installSpatialNavigation(() => (window.history.length > 1 ? nav(-1) : nav('/'))), [nav]);
+  // Esc / Backspace / remote "back": close what is open, never walk the history of the main sections.
+  // Player → back to the detail page; movie/series detail → back to the list it was opened from;
+  // profile picker → back to the app; anything else (Home, Film, Serie, Sport, TV, Cerca, ...) → no-op.
+  useEffect(
+    () =>
+      installSpatialNavigation(() => {
+        const path = window.location.pathname;
+        const fallback = path.startsWith('/play/') ? null : path.startsWith('/movie/') ? '/movies' : path.startsWith('/series/') ? '/series' : path === '/profiles' ? '/' : undefined;
+        if (fallback === undefined) return;
+        if (window.history.length > 1) nav(-1);
+        else nav(fallback ?? '/');
+      }),
+    [nav],
+  );
 
   // Scroll to top on route change (except player).
   useEffect(() => {
