@@ -33,6 +33,19 @@
   <img src="docs/screenshots/profiles.png" width="400" alt="Who's watching? profile picker" />
 </p>
 
+## Download
+
+Grab the latest build from [Releases](https://github.com/c4rtical/neftlix/releases/latest):
+
+| | File | First launch |
+|---|---|---|
+| **Windows** | `Neftlix-Setup-x.y.z.exe` | SmartScreen shows "unknown publisher": click *More info* → *Run anyway*. |
+| **macOS** | `Neftlix-x.y.z-universal.dmg` | Drag Neftlix to Applications. Since the app isn't signed yet, macOS says it is "damaged" or from an "unidentified developer": run `xattr -cr /Applications/Neftlix.app` once in Terminal, or right-click → *Open*. |
+
+The app runs the same server described below on your machine (127.0.0.1 only) and keeps its data in your user folder. Your credentials and your video never leave your computer.
+
+Prefer a browser on your TV or phone? Run the server on a PC or NAS instead (next section) and open it from any device on your network.
+
 ## Why
 
 Classic IPTV players are channel lists with a search box. Neftlix treats your provider's catalogue like a streaming service: a personalised home, "continue watching", series with seasons and episodes, favourites, a watchlist, football fixtures mapped to the channel that actually broadcasts them.
@@ -48,6 +61,7 @@ Classic IPTV players are channel lists with a search box. Neftlix treats your pr
 - **Sport** — sport channels in one place, plus **fixtures**: official kick-off times from a football calendar, matched to the channel carrying the game. Live matches appear on the home page. No replays.
 - **Smart catalogue** — duplicates across categories are merged, dead sources are skipped automatically, TMDB ids and ratings survive flaky provider responses.
 - **Works everywhere** — responsive layout from phone to TV, D-pad navigation, installable as a PWA.
+- **Desktop app** for Windows and macOS: double-click, connect your provider, watch. No Node, no terminal.
 
 ## Quick start
 
@@ -122,6 +136,8 @@ The browser never talks to the provider directly. Credentials stay in the local 
 - [ ] M3U playlists
 - [ ] Multiple providers
 - [ ] Native Android TV client on the same API
+- [ ] Signed and notarized desktop builds with auto-update
+- [ ] Linux AppImage
 
 See the [issues](https://github.com/c4rtical/neftlix/issues) for what is being worked on.
 

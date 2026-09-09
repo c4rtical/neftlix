@@ -20,10 +20,12 @@ mac:
   identity: null
   hardenedRuntime: false
   gatekeeperAssess: false
+  artifactName: "Neftlix-${version}-universal.${ext}"
 win:
   target:
     - target: nsis
       arch: [x64]
+  artifactName: "Neftlix-Setup-${version}.${ext}"
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true

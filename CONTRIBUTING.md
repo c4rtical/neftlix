@@ -40,3 +40,12 @@ npm run build        # production build of the web app
 ## Code of conduct
 
 Be kind, be specific, assume good faith. Harassment of any kind is not tolerated.
+
+## Releasing
+
+1. Move the `Unreleased` notes in `CHANGELOG.md` under a new version heading.
+2. `npm version X.Y.Z --workspaces --include-workspace-root --no-git-tag-version` keeps every package in sync (the desktop build refuses to package on a mismatch).
+
+   Bump `electronVersion` in `desktop/electron-builder.yml` whenever `electron` in `desktop/package.json` changes (the pin exists because electron-builder cannot resolve the hoisted range under npm workspaces).
+3. Commit, then `git tag vX.Y.Z && git push origin main vX.Y.Z`.
+4. The *Release* workflow builds the macOS dmg and Windows installer and attaches them to a **draft** release: review it on GitHub, paste the changelog, publish.
