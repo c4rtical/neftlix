@@ -1370,3 +1370,27 @@ input {
 .link-btn:hover {
   color: var(--fg);
 }
+
+/* Favorites / watchlist grid with remove button */
+.removable {
+  position: relative;
+}
+.remove-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 0;
+  background: rgba(0, 0, 0, 0.7);
+  color: #fff;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 3;
+}
+.removable:hover .remove-btn,
+.remove-btn:focus {
+  opacity: 1;
+}

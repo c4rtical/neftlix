@@ -30,6 +30,10 @@ export function MovieDetail() {
     const r = m.favorite ? await api.removeFavorite('movie', m.id) : await api.addFavorite('movie', m.id);
     setM({ ...m, favorite: r.favorite });
   };
+  const toggleWatchlist = async () => {
+    const r = m.watchlist ? await api.removeWatchlist('movie', m.id) : await api.addWatchlist('movie', m.id);
+    setM({ ...m, watchlist: r.watchlist });
+  };
   const toggleWatched = async () => {
     const watched = !(m.progress?.watched === 1);
     await api.setWatched('movie', m.id, watched);
@@ -64,6 +68,9 @@ export function MovieDetail() {
             )}
             <button className="btn" data-focus onClick={toggleFav}>
               {m.favorite ? '♥ Nei preferiti' : '♡ Preferiti'}
+            </button>
+            <button className="btn" data-focus onClick={toggleWatchlist}>
+              {m.watchlist ? '✓ Da guardare' : '+ Da guardare'}
             </button>
             <button className="btn" data-focus onClick={toggleWatched}>
               {m.progress?.watched === 1 ? 'Segna come non visto' : 'Segna come visto'}

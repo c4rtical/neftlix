@@ -55,6 +55,7 @@ export type MovieDetail = {
   categories: { id: string; name: string }[];
   progress: { position: number; duration: number; watched: number } | null;
   favorite: boolean;
+  watchlist: boolean;
 };
 
 export type Episode = {
@@ -88,6 +89,7 @@ export type SeriesDetail = {
   rating: number | null;
   category: { id: string; name: string } | null;
   favorite: boolean;
+  watchlist: boolean;
   nextEpisode: NextUp;
   seasons: { season: number; episodes: Episode[] }[];
 };

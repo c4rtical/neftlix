@@ -59,6 +59,11 @@ export function SeriesDetail() {
     setS({ ...s, favorite: r.favorite });
   };
 
+  const toggleWatchlist = async () => {
+    const r = s.watchlist ? await api.removeWatchlist('series', s.id) : await api.addWatchlist('series', s.id);
+    setS({ ...s, watchlist: r.watchlist });
+  };
+
   const setWatched = async (ep: Episode, watched: boolean) => {
     await api.setWatched('episode', ep.id, watched);
     setS({
@@ -99,6 +104,9 @@ export function SeriesDetail() {
             )}
             <button className="btn" data-focus onClick={toggleFav}>
               {s.favorite ? '♥ Nei preferiti' : '♡ Preferiti'}
+            </button>
+            <button className="btn" data-focus onClick={toggleWatchlist}>
+              {s.watchlist ? '✓ Da guardare' : '+ Da guardare'}
             </button>
           </div>
           {s.plot && <p className="detail-plot">{s.plot}</p>}

@@ -169,7 +169,8 @@ export function registerApiRoutes(app: FastifyInstance, ctx: Ctx) {
       .all(key);
     const progress = db.prepare(`SELECT position, duration, watched FROM progress WHERE item_type = 'movie' AND item_id = ?`).get(key) ?? null;
     const favorite = Boolean(db.prepare(`SELECT 1 FROM favorite WHERE item_type = 'movie' AND item_id = ?`).get(key));
-    return { ...m, id: m.key, sources, categories, progress, favorite };
+    const watchlist = Boolean(db.prepare(`SELECT 1 FROM watchlist WHERE item_type = 'movie' AND item_id = ?`).get(key));
+    return { ...m, id: m.key, sources, categories, progress, favorite, watchlist };
   });
 
   app.get('/api/series', async (req) => {
@@ -219,11 +220,13 @@ export function registerApiRoutes(app: FastifyInstance, ctx: Ctx) {
     }
     const category = db.prepare(`SELECT id, name FROM category WHERE kind = 'series' AND id = ?`).get(String(s.category_id)) ?? null;
     const favorite = Boolean(db.prepare(`SELECT 1 FROM favorite WHERE item_type = 'series' AND item_id = ?`).get(String(id)));
+    const watchlist = Boolean(db.prepare(`SELECT 1 FROM watchlist WHERE item_type = 'series' AND item_id = ?`).get(String(id)));
     return {
       ...s,
       id: String(s.id),
       category,
       favorite,
+      watchlist,
       nextEpisode: seriesNextUp(db, id),
       seasons: [...seasons.entries()].sort((a, b) => a[0] - b[0]).map(([season, eps]) => ({ season, episodes: eps })),
     };
@@ -267,6 +270,7 @@ export function registerApiRoutes(app: FastifyInstance, ctx: Ctx) {
 
     // 2. Per te
     push('new-episodes', 'Nuovi episodi delle tue serie', seriesWithNewEpisodes(db));
+    push('watchlist', 'Da guardare', watchlistCards(db), '/favorites?tab=watchlist');
     push('favorites', 'I tuoi preferiti', favoriteCards(db), '/favorites');
 
     // 3. Novità
@@ -326,6 +330,7 @@ export function registerApiRoutes(app: FastifyInstance, ctx: Ctx) {
       ON CONFLICT(item_type, item_id) DO UPDATE SET position = excluded.position, duration = excluded.duration,
         watched = excluded.watched, updated_at = excluded.updated_at, series_id = excluded.series_id
     `).run(b.type, id, seriesId, position, duration, watched, now());
+    if (watched && b.type === 'movie') db.prepare(`DELETE FROM watchlist WHERE item_type = 'movie' AND item_id = ?`).run(id);
     return { ok: true, watched: Boolean(watched) };
   });
 
@@ -347,6 +352,7 @@ export function registerApiRoutes(app: FastifyInstance, ctx: Ctx) {
       VALUES (?, ?, ?, 0, 0, 1, ?)
       ON CONFLICT(item_type, item_id) DO UPDATE SET watched = 1, updated_at = excluded.updated_at
     `).run(b.type, id, seriesId, now());
+    if (b.type === 'movie') db.prepare(`DELETE FROM watchlist WHERE item_type = 'movie' AND item_id = ?`).run(id);
     return { ok: true };
   });
 
@@ -498,6 +504,21 @@ export function registerApiRoutes(app: FastifyInstance, ctx: Ctx) {
     return { ok: true, source: fixtureState.source, error: fixtureState.error, count: fixtureState.count };
   });
 
+  app.get('/api/watchlist', async () => ({ items: watchlistCards(db) }));
+
+  app.post('/api/watchlist', async (req, reply) => {
+    const b = (req.body ?? {}) as { type?: string; id?: string };
+    if ((b.type !== 'movie' && b.type !== 'series') || !b.id) return reply.code(400).send({ error: 'type e id obbligatori' });
+    db.prepare('INSERT OR IGNORE INTO watchlist (item_type, item_id, created_at) VALUES (?, ?, ?)').run(b.type, String(b.id), now());
+    return { ok: true, watchlist: true };
+  });
+
+  app.delete('/api/watchlist/:type/:id', async (req) => {
+    const p = req.params as { type: string; id: string };
+    db.prepare('DELETE FROM watchlist WHERE item_type = ? AND item_id = ?').run(p.type, decodeURIComponent(p.id));
+    return { ok: true, watchlist: false };
+  });
+
   app.get('/api/favorites', async () => ({ items: favoriteCards(db) }));
 
   app.post('/api/favorites', async (req, reply) => {
@@ -535,10 +556,16 @@ function seriesWithNewEpisodes(db: Db): Card[] {
 }
 
 function favoriteCards(db: Db): Card[] {
+  return listCards(db, 'favorite');
+}
+
+function watchlistCards(db: Db): Card[] {
+  return listCards(db, 'watchlist');
+}
+
+function listCards(db: Db, table: 'favorite' | 'watchlist'): Card[] {
   const rows = db
-    .prepare(`
-      SELECT f.item_type, f.item_id, f.created_at FROM favorite f ORDER BY f.created_at DESC LIMIT 100
-    `)
+    .prepare(`SELECT f.item_type, f.item_id, f.created_at FROM ${table} f ORDER BY f.created_at DESC LIMIT 100`)
     .all() as { item_type: 'movie' | 'series'; item_id: string }[];
   const out: Card[] = [];
   for (const f of rows) {

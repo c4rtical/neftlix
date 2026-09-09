@@ -141,6 +141,13 @@ CREATE TABLE IF NOT EXISTS progress (
 CREATE INDEX IF NOT EXISTS progress_updated ON progress(updated_at DESC);
 CREATE INDEX IF NOT EXISTS progress_series ON progress(series_id);
 
+CREATE TABLE IF NOT EXISTS watchlist (
+  item_type TEXT NOT NULL,      -- 'movie' | 'series'
+  item_id TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  PRIMARY KEY (item_type, item_id)
+);
+
 CREATE TABLE IF NOT EXISTS favorite (
   item_type TEXT NOT NULL,      -- 'movie' | 'series'
   item_id TEXT NOT NULL,
