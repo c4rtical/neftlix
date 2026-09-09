@@ -3,6 +3,28 @@ import { useSearchParams } from 'react-router-dom';
 import { api } from '../api';
 import type { Card } from '../types';
 import { Row } from '../components/Row';
+import { IconSearch } from '../components/Icons';
+
+const HISTORY_KEY = 'search.history';
+const HISTORY_MAX = 10;
+
+function loadHistory(): string[] {
+  try {
+    const raw = localStorage.getItem(HISTORY_KEY);
+    const list = raw ? (JSON.parse(raw) as unknown) : [];
+    return Array.isArray(list) ? list.filter((x): x is string => typeof x === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveHistory(list: string[]) {
+  try {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(list));
+  } catch {
+    /* ignore */
+  }
+}
 
 export function Search() {
   const [params, setParams] = useSearchParams();
@@ -10,6 +32,7 @@ export function Search() {
   const [input, setInput] = useState(q);
   const [result, setResult] = useState<{ movies: Card[]; series: Card[] } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [history, setHistory] = useState<string[]>(loadHistory);
 
   useEffect(() => {
     const t = window.setTimeout(() => {
@@ -17,6 +40,10 @@ export function Search() {
     }, 250);
     return () => window.clearTimeout(t);
   }, [input, q, setParams]);
+
+  useEffect(() => {
+    setInput(q);
+  }, [q]);
 
   useEffect(() => {
     if (q.trim().length < 2) {
@@ -27,16 +54,65 @@ export function Search() {
     setBusy(true);
     api
       .search(q)
-      .then((r) => alive && setResult(r))
+      .then((r) => {
+        if (!alive) return;
+        setResult(r);
+        if (r.movies.length + r.series.length > 0) remember(q.trim());
+      })
       .finally(() => alive && setBusy(false));
     return () => {
       alive = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q]);
+
+  const remember = (term: string) => {
+    setHistory((prev) => {
+      const next = [term, ...prev.filter((x) => x.toLowerCase() !== term.toLowerCase())].slice(0, HISTORY_MAX);
+      saveHistory(next);
+      return next;
+    });
+  };
+
+  const forget = (term: string) => {
+    setHistory((prev) => {
+      const next = prev.filter((x) => x !== term);
+      saveHistory(next);
+      return next;
+    });
+  };
+
+  const clearAll = () => {
+    setHistory([]);
+    saveHistory([]);
+  };
+
+  const showHistory = q.trim().length < 2 && history.length > 0;
 
   return (
     <div className="page page-search">
       <input className="search-input" data-focus autoFocus placeholder="Cerca film e serie…" value={input} onChange={(e) => setInput(e.target.value)} />
+      {showHistory && (
+        <div className="search-history">
+          <div className="search-history-head">
+            <h3>Ricerche recenti</h3>
+            <button className="link-btn" data-focus onClick={clearAll}>
+              Cancella tutto
+            </button>
+          </div>
+          {history.map((term) => (
+            <div key={term} className="history-item">
+              <button className="history-term" data-focus onClick={() => setParams({ q: term }, { replace: true })}>
+                <IconSearch />
+                <span>{term}</span>
+              </button>
+              <button className="history-remove" data-focus onClick={() => forget(term)} title="Rimuovi dalla cronologia" aria-label={`Rimuovi ${term}`}>
+                ✕
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
       {busy && <div className="muted">Ricerca…</div>}
       {result && (
         <>

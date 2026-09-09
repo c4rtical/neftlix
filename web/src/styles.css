@@ -462,6 +462,7 @@ input {
   align-items: center;
   flex-wrap: wrap;
   gap: 10px;
+  margin-bottom: 22px;
 }
 .browse-search {
   flex: 1 1 220px;
@@ -1301,4 +1302,71 @@ input {
   .sport-chip-channel {
     margin-left: auto;
   }
+}
+
+/* Search history */
+.search-history {
+  max-width: 720px;
+  margin-bottom: 20px;
+}
+.search-history-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 4px;
+}
+.history-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-radius: var(--radius);
+}
+.history-item:hover,
+.history-item:focus-within {
+  background: var(--bg-2);
+}
+.history-term {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  padding: 10px 12px;
+  background: none;
+  border: 0;
+  color: var(--fg);
+  font-size: 1rem;
+  cursor: pointer;
+  border-radius: var(--radius);
+}
+.history-term svg {
+  width: 18px;
+  height: 18px;
+  color: var(--muted);
+  flex: 0 0 auto;
+}
+.history-remove {
+  background: none;
+  border: 0;
+  color: var(--muted);
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 8px 12px;
+  cursor: pointer;
+  border-radius: var(--radius);
+}
+.history-remove:hover {
+  color: var(--fg);
+}
+.link-btn {
+  background: none;
+  border: 0;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 4px 6px;
+  border-radius: 4px;
+}
+.link-btn:hover {
+  color: var(--fg);
 }
