@@ -36,6 +36,7 @@ Classic IPTV players are channel lists with a search box. Neftlix treats your pr
 ## Features
 
 - **Connect your provider** with the Xtream Codes credentials you already have. Nothing leaves your machine.
+- **Profiles** — Netflix-style "Who's watching?": up to 5 profiles per installation, each with its own resume positions, favourites and watchlist. Every device remembers its last profile.
 - **Home** built around what you do: resume, new episodes of the series you follow, watchlist, favourites, what's new, discovery rows that rotate daily.
 - **Movies & series** with posters, plot, cast, seasons → episodes, per-category search and sorting.
 - **Player** with resume position, episodes auto-marked as watched, "next episode", keyboard/remote shortcuts.
@@ -115,7 +116,7 @@ The browser never talks to the provider directly. Credentials stay in the local 
 - [ ] Audio remux for `.mkv` files with AC3/DTS tracks (browsers cannot decode them)
 - [ ] Automatic catalogue refresh
 - [ ] M3U playlists
-- [ ] Multiple profiles / providers
+- [ ] Multiple providers
 - [ ] Native Android TV client on the same API
 
 See the [issues](https://github.com/c4rtical/neftlix/issues) for what is being worked on.
