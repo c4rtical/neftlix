@@ -2,10 +2,96 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api';
 import type { Status } from '../types';
+import { getDesktop, useUpdateState } from '../desktop';
 
 function fmtDate(unix: number | null | undefined) {
   if (!unix) return '—';
   return new Date(unix * 1000).toLocaleString('it-IT');
+}
+
+function fmtTime(ms: number) {
+  return new Date(ms).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+}
+
+/** "App desktop" panel: only rendered inside the Electron app, where `window.neftlixDesktop` exists. */
+function DesktopUpdatePanel() {
+  const desktop = getDesktop();
+  const state = useUpdateState();
+  if (!desktop) return null;
+
+  const statusText = (() => {
+    if (!state) return '—';
+    switch (state.status) {
+      case 'idle':
+        return '—';
+      case 'checking':
+        return 'Controllo in corso…';
+      case 'up-to-date':
+        return `Aggiornata${state.checkedAt ? ` · controllata alle ${fmtTime(state.checkedAt)}` : ''}`;
+      case 'available':
+        return `Nuova versione ${state.latest} disponibile`;
+      case 'downloading':
+        return `Download ${state.progress ?? 0}%`;
+      case 'downloaded':
+        return 'Pronto da installare';
+      case 'error':
+        return `Errore: ${state.error}`;
+      default:
+        return '—';
+    }
+  })();
+
+  const busy = state?.status === 'checking' || state?.status === 'downloading';
+
+  return (
+    <section className="panel">
+      <h3>App desktop</h3>
+      <dl>
+        <dt>Versione</dt>
+        <dd>{desktop.version}</dd>
+        <dt>Stato</dt>
+        <dd>{statusText}</dd>
+      </dl>
+      {state?.status === 'downloading' && <progress className="update-progress" value={state.progress ?? 0} max={100} />}
+      <div className="panel-actions">
+        <button className="btn" data-focus onClick={() => desktop.check()} disabled={busy}>
+          Controlla aggiornamenti
+        </button>
+        {state?.status === 'available' &&
+          (state.assetName ? (
+            <button className="btn btn-primary" data-focus onClick={() => desktop.download()}>
+              Scarica {state.latest}
+            </button>
+          ) : (
+            state.releaseUrl && (
+              <a className="btn btn-primary" data-focus href={state.releaseUrl} target="_blank" rel="noreferrer">
+                Apri la pagina della release
+              </a>
+            )
+          ))}
+        {state?.status === 'downloaded' && (
+          <button className="btn btn-primary" data-focus onClick={() => desktop.install()}>
+            {state.manual ? 'Apri il file scaricato' : 'Installa e riavvia'}
+          </button>
+        )}
+        {state?.status === 'downloaded' && state.manual && (
+          <button className="btn btn-danger" data-focus onClick={() => desktop.quit()}>
+            Esci da Neftlix
+          </button>
+        )}
+      </div>
+      {state?.status === 'downloaded' && state.manual && (
+        <p className="muted small">Trascina Neftlix nella cartella Applicazioni sostituendo la versione attuale, poi riapri l'app.</p>
+      )}
+      {state?.releaseUrl && (
+        <p className="muted small">
+          <a href={state.releaseUrl} target="_blank" rel="noreferrer">
+            Note di rilascio
+          </a>
+        </p>
+      )}
+    </section>
+  );
 }
 
 export function Settings({ status, onChanged }: { status: Status; onChanged: () => void }) {
@@ -63,6 +149,7 @@ export function Settings({ status, onChanged }: { status: Status; onChanged: () 
   return (
     <div className="page page-settings">
       <h2>Impostazioni</h2>
+      <DesktopUpdatePanel />
       <section className="panel">
         <h3>Profili</h3>
         <dl>

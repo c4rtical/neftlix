@@ -3,6 +3,8 @@ import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-
 import { api } from './api';
 import type { Status } from './types';
 import { Nav } from './components/Nav';
+import { UpdateBanner } from './components/UpdateBanner';
+import { getDesktop, useUpdateState } from './desktop';
 import { Setup } from './pages/Setup';
 import { Home } from './pages/Home';
 import { Browse } from './pages/Browse';
@@ -21,6 +23,7 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
   const nav = useNavigate();
   const loc = useLocation();
+  const updateState = useUpdateState();
 
   const refresh = useCallback(() => {
     api
@@ -64,6 +67,13 @@ export function App() {
     return () => window.removeEventListener('neftlix:no-profile', refresh);
   }, [refresh]);
 
+  // Desktop app only: "Controlla aggiornamenti…" in the Aiuto menu navigates the window.
+  useEffect(() => {
+    const d = getDesktop();
+    if (!d) return;
+    return d.onNavigate((path) => nav(path));
+  }, [nav]);
+
   if (error) return <div className="page error">Server non raggiungibile: {error}</div>;
   if (!status) return <div className="page muted">Avvio…</div>;
   if (!status.configured) return <Setup lastLogin={status.lastLogin} onDone={refresh} />;
@@ -72,7 +82,8 @@ export function App() {
 
   return (
     <div className="app">
-      <Nav profile={profile} />
+      <Nav profile={profile} updateAvailable={updateState?.status === 'available' || updateState?.status === 'downloaded'} />
+      <UpdateBanner />
       <main className="main">
         <Routes>
           <Route path="/" element={<Home status={status} />} />

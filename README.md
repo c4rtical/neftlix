@@ -44,6 +44,8 @@ Grab the latest build from [Releases](https://github.com/c4rtical/neftlix/releas
 
 The app runs the same server described below on your machine (127.0.0.1 only) and keeps its data in your user folder. Your credentials and your video never leave your computer.
 
+The app checks GitHub Releases for updates: on Windows it installs them in one click, on macOS it downloads the new dmg and opens it (until the app is signed).
+
 Prefer a browser on your TV or phone? Run the server on a PC or NAS instead (see *Quick start* below) and open it from any device on your network.
 
 ## Why

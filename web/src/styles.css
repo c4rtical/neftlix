@@ -70,6 +70,45 @@ p {
   margin-bottom: 16px;
   color: var(--muted);
 }
+.update-banner {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--bg-3);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius);
+  padding: 10px 12px 10px 16px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  color: var(--fg);
+}
+.update-banner-close {
+  background: none;
+  border: 0;
+  color: var(--muted);
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: var(--radius);
+}
+.update-banner-close:hover,
+.update-banner-close:focus {
+  color: var(--fg);
+  outline: none;
+  background: rgba(255, 255, 255, 0.08);
+}
+.update-progress {
+  display: block;
+  width: 100%;
+  max-width: 320px;
+  height: 8px;
+  margin: 4px 0 14px;
+  accent-color: var(--accent);
+}
 .tag {
   display: inline-block;
   background: var(--bg-3);
@@ -148,6 +187,7 @@ input {
   background: var(--bg-3);
 }
 .nav-icon {
+  position: relative;
   display: flex;
   width: 22px;
   height: 22px;
@@ -158,6 +198,16 @@ input {
 }
 .nav-item.active .nav-icon {
   color: var(--accent-2);
+}
+.nav-badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 1px solid var(--bg);
 }
 .main {
   flex: 1;

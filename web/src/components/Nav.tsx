@@ -14,7 +14,7 @@ const items = [
   { to: '/settings', label: 'Impostazioni', icon: <IconSettings /> },
 ];
 
-export function Nav({ profile }: { profile: Profile }) {
+export function Nav({ profile, updateAvailable }: { profile: Profile; updateAvailable?: boolean }) {
   const loc = useLocation();
   if (loc.pathname.startsWith('/play/') || loc.pathname.startsWith('/profiles')) return null;
   return (
@@ -24,7 +24,10 @@ export function Nav({ profile }: { profile: Profile }) {
       </NavLink>
       {items.map((it) => (
         <NavLink key={it.to} to={it.to} end={it.to === '/'} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} data-focus>
-          <span className="nav-icon">{it.icon}</span>
+          <span className="nav-icon">
+            {it.icon}
+            {it.to === '/settings' && updateAvailable && <span className="nav-badge" />}
+          </span>
           <span className="nav-label">{it.label}</span>
         </NavLink>
       ))}

@@ -11,6 +11,7 @@ All notable changes to this project are documented here. The format follows [Kee
 - "Esci dal profilo" (sign out of the profile on this device) in Settings and on the profile picker.
 - Sport fixtures: ESPN's public scoreboard as a keyless fallback when TheSportsDB is rate-limited or empty (Serie A, Coppa Italia, Champions, Europa League, Premier, Liga, Bundesliga, Ligue 1).
 - "Log out" from the provider account (Settings and profile picker): the password is removed from the server, the login page comes back with host and username pre-filled, and catalogue, profiles and progress stay.
+- In-app updates for the desktop app (Windows one-click, macOS guided download).
 
 ### Changed
 - README: real screenshots (home, movies, series, sport, profiles), "Support the project" section with crypto addresses and a GitHub Sponsor button; the Italian README was dropped in favour of a single English one.
