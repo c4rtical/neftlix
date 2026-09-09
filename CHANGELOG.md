@@ -10,6 +10,7 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Fixed
 - Sport fixtures: TheSportsDB requests are paced and retried on rate limit; a persistent limit is shown as an error instead of an empty calendar.
+- Bodiless POST/DELETE calls (remove favourite, remove from watchlist, clear progress, sync now, disconnect provider) failed with HTTP 400 because the client always sent a JSON content-type; the header is now sent only with a body.
 
 ## [0.1.0] - 2026-09-09
 
