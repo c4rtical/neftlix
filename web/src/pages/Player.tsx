@@ -258,6 +258,13 @@ export function Player() {
     }
   };
 
+  // After clicking a native control (e.g. the pause button), keyboard focus sits on that button:
+  // Space/Enter would then both run our toggle on keydown AND "click" the button on keyup, so the
+  // video restarts and pauses again. Cancelling the keyup suppresses the native activation.
+  const onKeyUp = (e: React.KeyboardEvent) => {
+    if (e.key === ' ' || e.key === 'Enter' || e.key === 'MediaPlayPause') e.preventDefault();
+  };
+
   const onKey = (e: React.KeyboardEvent) => {
     const v = videoRef.current;
     if (!v) return;
@@ -287,6 +294,8 @@ export function Player() {
       case 'Enter':
       case 'MediaPlayPause':
         e.preventDefault();
+        // Holding the key repeats keydown; toggling on every repeat flickers between play and pause.
+        if (e.repeat) break;
         if (v.paused) void v.play();
         else v.pause();
         break;
@@ -363,6 +372,7 @@ export function Player() {
           onEnded={onEnded}
           onError={onError}
           onKeyDown={onKey}
+          onKeyUp={onKeyUp}
         />
       )}
       <div className="player-top">
