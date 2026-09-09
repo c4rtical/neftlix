@@ -4,6 +4,8 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-09
+
 ### Added
 - Desktop app (Electron) for Windows and macOS: runs the bundled server on 127.0.0.1 and opens it in a window; builds published on GitHub Releases from `v*` tags.
 - Profiles: "Who's watching?" screen, up to 5 profiles with separate progress, favourites and watchlist; avatar in the navigation to switch; existing data migrates to a "Principale" profile.
