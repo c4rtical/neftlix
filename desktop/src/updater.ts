@@ -1,7 +1,7 @@
 import { createWriteStream } from 'node:fs';
 import { rename, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
-import { Readable } from 'node:stream';
+import { PassThrough, Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { compareSemver, parseTag, pickAsset, type PickedAsset, type ReleaseAsset } from './versions.js';
 
@@ -43,10 +43,14 @@ type GithubRelease = {
   assets: ReleaseAsset[];
 };
 
+type Pending = { resolve: () => void; reject: (e: Error) => void };
+
 const RELEASES_API = 'https://api.github.com/repos/c4rtical/neftlix/releases/latest';
 const CHECK_EVERY_MS = 6 * 3600 * 1000;
 const FIRST_CHECK_MS = 10_000;
 const PROGRESS_THROTTLE_MS = 250; // ~4/s
+const CHECK_TIMEOUT_MS = 60_000; // safety net if electron-updater never fires an event
+const AUTO_DOWNLOAD_TIMEOUT_MS = 15 * 60 * 1000;
 
 export type Updater = {
   getState(): UpdateState;
@@ -64,6 +68,11 @@ export function createUpdater(deps: UpdaterDeps): Updater {
   let manual = deps.platform !== 'win32' || !deps.packaged || !deps.autoUpdater;
   let pickedAsset: PickedAsset | null = null;
 
+  // At most one in-flight check() and one in-flight download() against electron-updater at a
+  // time; the persistent listeners below (registered once, not per-call) resolve/reject these.
+  let pendingCheck: Pending | null = null;
+  let pendingDownload: Pending | null = null;
+
   let state: UpdateState = {
     status: 'idle',
     current: deps.currentVersion,
@@ -77,6 +86,41 @@ export function createUpdater(deps: UpdaterDeps): Updater {
   function setState(patch: Partial<UpdateState>) {
     state = { ...state, ...patch, manual };
     emit();
+  }
+
+  // Registered once (not per check()/download() call) so long-running Windows sessions don't
+  // accumulate duplicate listeners on electron-updater's singleton and fire N state transitions
+  // per real event.
+  if (deps.autoUpdater) {
+    const au = deps.autoUpdater;
+    au.on('update-available', ((info: { version: string }) => {
+      setState({ status: 'available', latest: info.version, checkedAt: Date.now() });
+      pendingCheck?.resolve();
+      pendingCheck = null;
+    }) as never);
+    au.on('update-not-available', (() => {
+      setState({ status: 'up-to-date', checkedAt: Date.now() });
+      pendingCheck?.resolve();
+      pendingCheck = null;
+    }) as never);
+    au.on('download-progress', ((p: { percent: number }) => {
+      setState({ status: 'downloading', progress: p.percent });
+    }) as never);
+    au.on('update-downloaded', (() => {
+      setState({ status: 'downloaded' });
+      pendingDownload?.resolve();
+      pendingDownload = null;
+    }) as never);
+    au.on('error', ((err: Error) => {
+      const e = err instanceof Error ? err : new Error(String(err));
+      if (pendingDownload) {
+        pendingDownload.reject(e);
+        pendingDownload = null;
+      } else if (pendingCheck) {
+        pendingCheck.reject(e);
+        pendingCheck = null;
+      }
+    }) as never);
   }
 
   async function fetchLatestRelease(): Promise<GithubRelease | null> {
@@ -125,25 +169,33 @@ export function createUpdater(deps: UpdaterDeps): Updater {
   }
 
   async function check(): Promise<UpdateState> {
+    if (state.status === 'checking') return state;
     setState({ status: 'checking' });
 
     if (deps.autoUpdater && !manual) {
+      const au = deps.autoUpdater;
       try {
         await new Promise<void>((resolve, reject) => {
-          const au = deps.autoUpdater;
-          if (!au) return reject(new Error('no autoUpdater'));
-          au.on('update-available', ((info: { version: string }) => {
-            setState({ status: 'available', latest: info.version, checkedAt: Date.now() });
-            resolve();
-          }) as never);
-          au.on('update-not-available', (() => {
-            setState({ status: 'up-to-date', checkedAt: Date.now() });
-            resolve();
-          }) as never);
-          au.on('error', ((err: Error) => {
-            reject(err instanceof Error ? err : new Error(String(err)));
-          }) as never);
-          au.checkForUpdates().catch(reject);
+          const timer = setTimeout(() => {
+            pendingCheck = null;
+            reject(new Error('timed out waiting for electron-updater'));
+          }, CHECK_TIMEOUT_MS);
+          timer.unref?.();
+          pendingCheck = {
+            resolve: () => {
+              clearTimeout(timer);
+              resolve();
+            },
+            reject: (e) => {
+              clearTimeout(timer);
+              reject(e);
+            },
+          };
+          au.checkForUpdates().catch((e: unknown) => {
+            pendingCheck = null;
+            clearTimeout(timer);
+            reject(e instanceof Error ? e : new Error(String(e)));
+          });
         });
         return state;
       } catch (e) {
@@ -161,17 +213,26 @@ export function createUpdater(deps: UpdaterDeps): Updater {
     if (!au) return state;
     try {
       await new Promise<void>((resolve, reject) => {
-        au.on('download-progress', ((p: { percent: number }) => {
-          setState({ status: 'downloading', progress: p.percent });
-        }) as never);
-        au.on('update-downloaded', (() => {
-          setState({ status: 'downloaded' });
-          resolve();
-        }) as never);
-        au.on('error', ((err: Error) => {
-          reject(err instanceof Error ? err : new Error(String(err)));
-        }) as never);
-        au.downloadUpdate().catch(reject);
+        const timer = setTimeout(() => {
+          pendingDownload = null;
+          reject(new Error('timed out waiting for electron-updater download'));
+        }, AUTO_DOWNLOAD_TIMEOUT_MS);
+        timer.unref?.();
+        pendingDownload = {
+          resolve: () => {
+            clearTimeout(timer);
+            resolve();
+          },
+          reject: (e) => {
+            clearTimeout(timer);
+            reject(e);
+          },
+        };
+        au.downloadUpdate().catch((e: unknown) => {
+          pendingDownload = null;
+          clearTimeout(timer);
+          reject(e instanceof Error ? e : new Error(String(e)));
+        });
       });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -202,8 +263,9 @@ export function createUpdater(deps: UpdaterDeps): Updater {
       const total = Number(res.headers.get('content-length') ?? asset.size) || asset.size;
       let received = 0;
 
-      const source = Readable.fromWeb(res.body as never);
-      source.on('data', (chunk: Buffer) => {
+      const source = Readable.fromWeb(res.body as unknown as import('node:stream/web').ReadableStream<Uint8Array>);
+      const counter = new PassThrough();
+      counter.on('data', (chunk: Buffer) => {
         received += chunk.length;
         const now = Date.now();
         if (now - lastEmit >= PROGRESS_THROTTLE_MS) {
@@ -213,7 +275,7 @@ export function createUpdater(deps: UpdaterDeps): Updater {
         }
       });
 
-      await pipeline(source, createWriteStream(tmpPath));
+      await pipeline(source, counter, createWriteStream(tmpPath));
       await rename(tmpPath, finalPath);
       setState({ status: 'downloaded', filePath: finalPath, progress: 100 });
     } catch (e) {
@@ -226,6 +288,7 @@ export function createUpdater(deps: UpdaterDeps): Updater {
   }
 
   async function download(): Promise<UpdateState> {
+    if (state.status === 'downloading') return state;
     if (state.status !== 'available') return state;
     if (deps.autoUpdater && !manual) return downloadAuto();
     return downloadManual();
