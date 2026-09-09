@@ -15,6 +15,9 @@ CREATE TABLE watchlist (item_type TEXT NOT NULL, item_id TEXT NOT NULL, created_
 CREATE TABLE favorite (item_type TEXT NOT NULL, item_id TEXT NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY (item_type, item_id));
 `;
 
+/** node:sqlite rows have a null prototype; copy them so deepEqual can compare against literals. */
+const plain = <T extends object>(rows: T[]) => rows.map((r) => ({ ...r }));
+
 function tmpDbPath() {
   return join(mkdtempSync(join(tmpdir(), 'neftlix-test-')), 'neftlix.sqlite');
 }
@@ -36,10 +39,10 @@ test('migrates an old database: creates profile 1 and assigns existing rows to i
   seedOldDb(path, true);
   const db = openDb(path);
   const profiles = db.prepare('SELECT id, name, avatar FROM profile').all() as { id: number; name: string; avatar: string }[];
-  assert.deepEqual(profiles, [{ id: 1, name: 'Principale', avatar: 'red' }]);
-  assert.deepEqual(db.prepare('SELECT profile_id, item_id, position FROM progress').all(), [{ profile_id: 1, item_id: 'tmdb:1', position: 100 }]);
-  assert.deepEqual(db.prepare('SELECT profile_id, item_id FROM watchlist').all(), [{ profile_id: 1, item_id: '7' }]);
-  assert.deepEqual(db.prepare('SELECT profile_id, item_id FROM favorite').all(), [{ profile_id: 1, item_id: 'tmdb:2' }]);
+  assert.deepEqual(plain(profiles), [{ id: 1, name: 'Principale', avatar: 'red' }]);
+  assert.deepEqual(plain(db.prepare('SELECT profile_id, item_id, position FROM progress').all()), [{ profile_id: 1, item_id: 'tmdb:1', position: 100 }]);
+  assert.deepEqual(plain(db.prepare('SELECT profile_id, item_id FROM watchlist').all()), [{ profile_id: 1, item_id: '7' }]);
+  assert.deepEqual(plain(db.prepare('SELECT profile_id, item_id FROM favorite').all()), [{ profile_id: 1, item_id: 'tmdb:2' }]);
   db.close();
 });
 
