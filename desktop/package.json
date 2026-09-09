@@ -11,16 +11,18 @@
   "scripts": {
     "build:server": "cd .. && npm run build --workspace=server",
     "build:web": "cd .. && node -e \"require('node:fs').rmSync('web/dist',{recursive:true,force:true})\" && npm run build --workspace=web",
-    "build:main": "tsc -p .",
+    "build:main": "tsc -p . && tsc -p tsconfig.preload.json",
     "prepare:dist": "node scripts/prepare.mjs",
     "build": "npm run build:server && npm run build:web && npm run build:main && npm run prepare:dist",
-    "check": "tsc --noEmit -p .",
+    "check": "tsc --noEmit -p . && tsc --noEmit -p tsconfig.preload.json",
+    "test": "node --test --no-warnings=ExperimentalWarning 'test/**/*.test.ts'",
     "dev": "npm run build && electron .",
     "dist": "npm run build && electron-builder --publish never",
     "release": "npm run build && electron-builder --publish always"
   },
   "dependencies": {
     "@fastify/static": "^8.0.0",
+    "electron-updater": "^6.8.0",
     "fastify": "^5.0.0"
   },
   "devDependencies": {

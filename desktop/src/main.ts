@@ -1,7 +1,8 @@
-import { app, BrowserWindow, dialog, Menu, shell, type MenuItemConstructorOptions } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, shell, type MenuItemConstructorOptions } from 'electron';
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { startServer, type RunningServer } from './server.js';
+import { createUpdater, type Updater, type UpdaterDeps } from './updater.js';
 import { loadWindowState, trackWindowState } from './window-state.js';
 
 const REPO = 'https://github.com/c4rtical/neftlix';
@@ -9,6 +10,7 @@ const DEBUG = process.env.NEFTLIX_DEBUG === '1';
 
 let server: RunningServer | null = null;
 let win: BrowserWindow | null = null;
+let updater: Updater | null = null;
 
 function log(line: string) {
   const msg = `${new Date().toISOString()} ${line}`;
@@ -26,6 +28,14 @@ function buildMenu(dataDir: string) {
     role: 'help',
     label: 'Aiuto',
     submenu: [
+      {
+        label: 'Controlla aggiornamenti…',
+        click: async () => {
+          if (!updater) return;
+          const s = await updater.check();
+          if (s.status === 'available' || s.status === 'downloaded') win?.webContents.send('navigate', '/settings');
+        },
+      },
       { label: 'Neftlix su GitHub', click: () => void shell.openExternal(REPO) },
       { label: 'Segnala un problema', click: () => void shell.openExternal(`${REPO}/issues/new/choose`) },
       { label: 'Apri la cartella dei dati', click: () => void shell.openPath(dataDir) },
@@ -68,7 +78,13 @@ function createWindow(url: string) {
     backgroundColor: '#0b0b0f',
     autoHideMenuBar: process.platform !== 'darwin',
     show: false,
-    webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true },
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      preload: join(import.meta.dirname, 'preload.cjs'),
+      additionalArguments: [`--neftlix-version=${app.getVersion()}`],
+    },
   });
   if (state.maximized) win.maximize();
   trackWindowState(win, userData);
@@ -124,8 +140,37 @@ async function boot() {
     app.quit();
     return;
   }
+  // Windows only, and only in a packaged build: electron-updater drives checkForUpdates/downloadUpdate/
+  // quitAndInstall against latest.yml. Everywhere else (macOS, dev) it's never imported.
+  let auto: UpdaterDeps['autoUpdater'];
+  if (process.platform === 'win32' && app.isPackaged) {
+    const { autoUpdater } = await import('electron-updater');
+    autoUpdater.autoDownload = false;
+    autoUpdater.autoInstallOnAppQuit = false;
+    auto = autoUpdater;
+  }
+  const upd = createUpdater({
+    // NEFTLIX_FAKE_VERSION: dev-only override to exercise the update UI against the real GitHub
+    // release without needing an actual older build installed.
+    currentVersion: process.env.NEFTLIX_FAKE_VERSION ?? app.getVersion(),
+    platform: process.platform,
+    packaged: app.isPackaged,
+    downloadsDir: app.getPath('downloads'),
+    log,
+    openPath: (p) => shell.openPath(p),
+    autoUpdater: auto,
+  });
+  updater = upd;
+  ipcMain.handle('update:get-state', () => upd.getState());
+  ipcMain.handle('update:check', () => upd.check());
+  ipcMain.handle('update:download', () => upd.download());
+  ipcMain.handle('update:install', () => upd.install());
+  ipcMain.on('app:quit', () => app.quit());
+  upd.onState((s) => win?.webContents.send('update:state', s));
+
   buildMenu(dataDir);
   createWindow(server.url);
+  upd.startSchedule();
 }
 
 if (!app.requestSingleInstanceLock()) {

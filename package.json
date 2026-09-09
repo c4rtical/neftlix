@@ -15,7 +15,7 @@
     "build": "npm run build --workspace=web",
     "start": "npm run build && npm run start --workspace=server",
     "check": "npm run check --workspace=server && npm run check --workspace=web && npm run check --workspace=desktop",
-    "test": "npm run test --workspace=server",
+    "test": "npm run test --workspace=server && npm run test --workspace=desktop",
     "desktop": "npm run dev --workspace=desktop",
     "desktop:dist": "npm run dist --workspace=desktop"
   },

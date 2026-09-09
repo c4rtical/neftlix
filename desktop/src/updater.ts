@@ -1,0 +1,263 @@
+import { createWriteStream } from 'node:fs';
+import { rename, unlink } from 'node:fs/promises';
+import { join } from 'node:path';
+import { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
+import { compareSemver, parseTag, pickAsset, type PickedAsset, type ReleaseAsset } from './versions.js';
+
+export type UpdateStatus = 'idle' | 'checking' | 'up-to-date' | 'available' | 'downloading' | 'downloaded' | 'error';
+export type UpdateState = {
+  status: UpdateStatus;
+  current: string;
+  latest?: string;
+  progress?: number;
+  filePath?: string;
+  releaseUrl?: string;
+  assetName?: string;
+  error?: string;
+  checkedAt?: number;
+  manual: boolean;
+};
+
+export type UpdaterDeps = {
+  currentVersion: string;
+  platform: NodeJS.Platform;
+  packaged: boolean;
+  downloadsDir: string;
+  log: (line: string) => void;
+  openPath: (p: string) => Promise<string>; // shell.openPath
+  /** Windows only: electron-updater's autoUpdater, injected so tests/dev never load it. */
+  autoUpdater?: {
+    checkForUpdates(): Promise<unknown>;
+    downloadUpdate(): Promise<unknown>;
+    quitAndInstall(): void;
+    on(ev: string, cb: (...a: never[]) => void): unknown;
+    autoDownload: boolean;
+    autoInstallOnAppQuit: boolean;
+  };
+};
+
+type GithubRelease = {
+  tag_name: string;
+  html_url: string;
+  assets: ReleaseAsset[];
+};
+
+const RELEASES_API = 'https://api.github.com/repos/c4rtical/neftlix/releases/latest';
+const CHECK_EVERY_MS = 6 * 3600 * 1000;
+const FIRST_CHECK_MS = 10_000;
+const PROGRESS_THROTTLE_MS = 250; // ~4/s
+
+export type Updater = {
+  getState(): UpdateState;
+  onState(cb: (s: UpdateState) => void): () => void;
+  check(): Promise<UpdateState>;
+  download(): Promise<UpdateState>;
+  install(): Promise<void>;
+  startSchedule(): void;
+};
+
+export function createUpdater(deps: UpdaterDeps): Updater {
+  const listeners = new Set<(s: UpdateState) => void>();
+  // `manual` starts true unless we're a packaged Windows build with electron-updater injected;
+  // it can also flip to true for the rest of this session if electron-updater fails mid-check.
+  let manual = deps.platform !== 'win32' || !deps.packaged || !deps.autoUpdater;
+  let pickedAsset: PickedAsset | null = null;
+
+  let state: UpdateState = {
+    status: 'idle',
+    current: deps.currentVersion,
+    manual,
+  };
+
+  function emit() {
+    for (const cb of listeners) cb(state);
+  }
+
+  function setState(patch: Partial<UpdateState>) {
+    state = { ...state, ...patch, manual };
+    emit();
+  }
+
+  async function fetchLatestRelease(): Promise<GithubRelease | null> {
+    const res = await fetch(RELEASES_API, {
+      headers: { accept: 'application/vnd.github+json', 'user-agent': 'neftlix-desktop' },
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (res.status === 404) return null; // no release published yet
+    if (!res.ok) throw new Error(`GitHub API ${res.status}`);
+    return (await res.json()) as GithubRelease;
+  }
+
+  async function checkViaApi(): Promise<UpdateState> {
+    let release: GithubRelease | null;
+    try {
+      release = await fetchLatestRelease();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      deps.log(`update check failed: ${msg}`);
+      setState({ status: 'error', error: 'Impossibile contattare GitHub' });
+      return state;
+    }
+    if (!release) {
+      setState({ status: 'up-to-date', checkedAt: Date.now() });
+      return state;
+    }
+    const latest = parseTag(release.tag_name);
+    if (!latest) {
+      deps.log(`update check: tag "${release.tag_name}" is not semver, ignoring`);
+      setState({ status: 'up-to-date', checkedAt: Date.now() });
+      return state;
+    }
+    if (compareSemver(latest, deps.currentVersion) <= 0) {
+      setState({ status: 'up-to-date', latest, checkedAt: Date.now() });
+      return state;
+    }
+    pickedAsset = pickAsset(release.assets, deps.platform);
+    setState({
+      status: 'available',
+      latest,
+      releaseUrl: release.html_url,
+      assetName: pickedAsset?.name,
+      checkedAt: Date.now(),
+    });
+    return state;
+  }
+
+  async function check(): Promise<UpdateState> {
+    setState({ status: 'checking' });
+
+    if (deps.autoUpdater && !manual) {
+      try {
+        await new Promise<void>((resolve, reject) => {
+          const au = deps.autoUpdater;
+          if (!au) return reject(new Error('no autoUpdater'));
+          au.on('update-available', ((info: { version: string }) => {
+            setState({ status: 'available', latest: info.version, checkedAt: Date.now() });
+            resolve();
+          }) as never);
+          au.on('update-not-available', (() => {
+            setState({ status: 'up-to-date', checkedAt: Date.now() });
+            resolve();
+          }) as never);
+          au.on('error', ((err: Error) => {
+            reject(err instanceof Error ? err : new Error(String(err)));
+          }) as never);
+          au.checkForUpdates().catch(reject);
+        });
+        return state;
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        deps.log(`electron-updater check failed, falling back to GitHub API: ${msg}`);
+        manual = true; // fall back to manual mode for the rest of this session
+      }
+    }
+
+    return checkViaApi();
+  }
+
+  async function downloadAuto(): Promise<UpdateState> {
+    const au = deps.autoUpdater;
+    if (!au) return state;
+    try {
+      await new Promise<void>((resolve, reject) => {
+        au.on('download-progress', ((p: { percent: number }) => {
+          setState({ status: 'downloading', progress: p.percent });
+        }) as never);
+        au.on('update-downloaded', (() => {
+          setState({ status: 'downloaded' });
+          resolve();
+        }) as never);
+        au.on('error', ((err: Error) => {
+          reject(err instanceof Error ? err : new Error(String(err)));
+        }) as never);
+        au.downloadUpdate().catch(reject);
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      deps.log(`download failed: ${msg}`);
+      setState({ status: 'error', error: 'Download interrotto' });
+    }
+    return state;
+  }
+
+  async function downloadManual(): Promise<UpdateState> {
+    if (!deps.packaged) {
+      setState({ status: 'error', error: "Download disponibile solo nell'app installata" });
+      return state;
+    }
+    if (!pickedAsset) {
+      setState({ status: 'error', error: 'Nessun file scaricabile per questa piattaforma' });
+      return state;
+    }
+    const asset = pickedAsset;
+    const finalPath = join(deps.downloadsDir, asset.name);
+    const tmpPath = `${finalPath}.part`;
+    setState({ status: 'downloading', progress: 0 });
+
+    let lastEmit = 0;
+    try {
+      const res = await fetch(asset.url, { signal: AbortSignal.timeout(10 * 60 * 1000) });
+      if (!res.ok || !res.body) throw new Error(`download failed: ${res.status}`);
+      const total = Number(res.headers.get('content-length') ?? asset.size) || asset.size;
+      let received = 0;
+
+      const source = Readable.fromWeb(res.body as never);
+      source.on('data', (chunk: Buffer) => {
+        received += chunk.length;
+        const now = Date.now();
+        if (now - lastEmit >= PROGRESS_THROTTLE_MS) {
+          lastEmit = now;
+          const pct = total > 0 ? Math.min(100, Math.round((received / total) * 100)) : undefined;
+          setState({ status: 'downloading', progress: pct });
+        }
+      });
+
+      await pipeline(source, createWriteStream(tmpPath));
+      await rename(tmpPath, finalPath);
+      setState({ status: 'downloaded', filePath: finalPath, progress: 100 });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      deps.log(`download failed: ${msg}`);
+      await unlink(tmpPath).catch(() => {});
+      setState({ status: 'error', error: 'Download interrotto' });
+    }
+    return state;
+  }
+
+  async function download(): Promise<UpdateState> {
+    if (state.status !== 'available') return state;
+    if (deps.autoUpdater && !manual) return downloadAuto();
+    return downloadManual();
+  }
+
+  async function install(): Promise<void> {
+    if (deps.autoUpdater && !manual) {
+      deps.autoUpdater.quitAndInstall();
+      return;
+    }
+    if (state.filePath) await deps.openPath(state.filePath);
+  }
+
+  function startSchedule(): void {
+    if (!deps.packaged) return;
+    const t1 = setTimeout(() => void check(), FIRST_CHECK_MS);
+    t1.unref();
+    const t2 = setInterval(() => void check(), CHECK_EVERY_MS);
+    t2.unref();
+  }
+
+  function onState(cb: (s: UpdateState) => void): () => void {
+    listeners.add(cb);
+    return () => listeners.delete(cb);
+  }
+
+  return {
+    getState: () => state,
+    onState,
+    check,
+    download,
+    install,
+    startSchedule,
+  };
+}
