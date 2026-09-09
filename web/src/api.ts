@@ -3,7 +3,7 @@ import type { Card, Category, EpgItem, EpisodeDetail, HomeRow, LiveChannel, Live
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, {
     ...init,
-    headers: { 'content-type': 'application/json', ...(init?.headers ?? {}) },
+    headers: { ...(init?.body ? { 'content-type': 'application/json' } : {}), ...(init?.headers ?? {}) },
   });
   if (!res.ok) {
     let msg = `HTTP ${res.status}`;
