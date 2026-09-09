@@ -1,0 +1,17 @@
+services:
+  neftlix:
+    image: ghcr.io/c4rtical/neftlix:latest
+    # build: .            # uncomment to build from this checkout instead
+    container_name: neftlix
+    restart: unless-stopped
+    ports:
+      - "8787:8787"
+    volumes:
+      - neftlix-data:/data
+    environment:
+      # NEFTLIX_PASSWORD: change-me      # require a password on every request
+      # FOOTBALL_DATA_KEY: your-key      # optional, richer fixtures calendar
+      LOG_LEVEL: info
+
+volumes:
+  neftlix-data:

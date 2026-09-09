@@ -1,6 +1,7 @@
 import Fastify from 'fastify';
 import fastifyStatic from '@fastify/static';
 import { existsSync } from 'node:fs';
+import { timingSafeEqual } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { openDb } from './db.ts';
@@ -35,6 +36,26 @@ const app = Fastify({
   logger: { level: process.env.LOG_LEVEL ?? 'info' },
   bodyLimit: 1024 * 1024,
 });
+
+// Optional password: protects every route (API, streams and the web app itself).
+const PASSWORD = process.env.NEFTLIX_PASSWORD?.trim();
+if (PASSWORD) {
+  const expected = Buffer.from(PASSWORD);
+  app.addHook('onRequest', async (req, reply) => {
+    const header = req.headers.authorization ?? '';
+    let ok = false;
+    if (header.startsWith('Basic ')) {
+      const decoded = Buffer.from(header.slice(6), 'base64').toString('utf8');
+      const given = Buffer.from(decoded.slice(decoded.indexOf(':') + 1));
+      ok = given.length === expected.length && timingSafeEqual(given, expected);
+    }
+    if (!ok) {
+      reply.header('www-authenticate', 'Basic realm="Neftlix", charset="UTF-8"');
+      return reply.code(401).send({ error: 'Password richiesta' });
+    }
+  });
+  app.log.info('password protection enabled (NEFTLIX_PASSWORD)');
+}
 
 registerApiRoutes(app, ctx);
 registerStreamRoutes(app, ctx);

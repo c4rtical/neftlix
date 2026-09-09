@@ -1,6 +1,6 @@
-# Spike provider Xtream — risultati (2026-09-09)
+# Come si comporta un pannello Xtream Codes reale
 
-Ispezione delle risposte reali del pannello Xtream di test. Le credenziali sono in `.env` (ignorato da git) e non vanno mai committate.
+Note raccolte ispezionando le risposte di un pannello Xtream durante lo sviluppo (settembre 2026). Nomi, numeri e categorie sono di un singolo provider e servono solo come esempio: altri pannelli differiscono. Nessuna credenziale è inclusa; per i test locali si usa `.env` (ignorato da git).
 
 ## Autenticazione
 
@@ -31,7 +31,7 @@ Chiavi: `num, name, stream_type, stream_id, stream_icon, rating, rating_5based, 
 
 **Duplicati.** Il provider replica lo stesso film in più categorie con `stream_id` diversi: 19 776 TMDB unici coprono 65 634 righe. Esempio: "Pinocchio: Unstrung (2026)" esiste come 683439 (Film più votati), 710749 (Recenti), 710753 (Horror).
 
-**Righe morte.** Gli `stream_id` nelle categorie curate ("Film più votati", "Film più visti ultima settimana") rispondono 200 `text/html` vuoto e non riproducono. Gli stessi film nelle categorie per genere o "Recenti" rispondono 302 + 206 `video/*` e funzionano. Regola di dedup: raggruppare per `tmdb` (fallback: nome normalizzato) e scegliere come sorgente uno `stream_id` che NON appartenga a categorie curate; tenere l'elenco delle categorie come tag del film.
+**Righe morte.** Gli `stream_id` nelle categorie "curate" (tipo "più votati", "più visti della settimana") rispondono 200 `text/html` vuoto e non riproducono. Gli stessi film nelle categorie per genere o "Recenti" rispondono 302 + 206 `video/*` e funzionano. Regola di dedup: raggruppare per `tmdb` (fallback: nome normalizzato) e scegliere come sorgente uno `stream_id` che NON appartenga a categorie curate; tenere l'elenco delle categorie come tag del film.
 
 ### Serie (`get_series`)
 
@@ -74,7 +74,7 @@ Dimensione: 96 KB per una serie da 42 episodi. Va caricato on demand e cachato, 
 
 - `get_live_categories`: 60 categorie. `get_live_streams`: 6 131 righe, 1.9 MB.
 - Chiavi canale: `num, name, stream_type, stream_id, stream_icon, epg_channel_id, added, is_adult, category_id, category_ids, custom_sid, tv_archive, direct_source, tv_archive_duration`.
-- 44 righe sono separatori visivi ("----Sport Skynet----") con `direct_source` che punta a un mp4 placeholder: vanno scartate (nome che inizia con `---`).
+- 44 righe sono separatori visivi ("----Sport----") con `direct_source` che punta a un mp4 placeholder: vanno scartate (nome che inizia con `---`).
 - Stream: `{host}/live/U/P/{id}.m3u8` (HLS, segmenti da 10 s con path relativi `/hls/{token}/{id}_{seq}.ts` sull'edge dopo il 302) oppure `{host}/live/U/P/{id}.ts` (MPEG-TS continuo). Entrambi richiedono lo User-Agent da player.
 - Un canale può rispondere 407 `Proxy Authentication Required`: canale non disponibile in quel momento, non un problema di credenziali. Riprovare o cambiare canale.
 - `get_short_epg&stream_id=X&limit=N`: titoli e descrizioni base64; `start_timestamp`/`stop_timestamp` unix; `now_playing` non sempre valorizzato. Solo 580 canali su 6 131 hanno `epg_channel_id`.

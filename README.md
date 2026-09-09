@@ -1,59 +1,129 @@
-# Neftlix
+<p align="center">
+  <img src="web/public/logo.svg" width="96" alt="Neftlix logo" />
+</p>
 
-Client moderno, in stile Netflix, per i contenuti a cui hai già accesso tramite il tuo provider IPTV (protocollo Xtream Codes).
+<h1 align="center">Neftlix</h1>
 
-L'app non include contenuti, server, playlist o credenziali: inserisci i dati del tuo provider al primo avvio e restano solo sul tuo dispositivo.
+<p align="center">
+  A modern, Netflix-style client for the IPTV provider you already have.<br/>
+  Movies, series, live TV and sport — with a UX that doesn't feel like 2009.
+</p>
 
-## Requisiti
+<p align="center">
+  <a href="https://github.com/c4rtical/neftlix/actions/workflows/ci.yml"><img src="https://github.com/c4rtical/neftlix/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="MIT license" /></a>
+  <img src="https://img.shields.io/badge/node-%3E%3D23.6-brightgreen" alt="Node 23.6+" />
+  <a href="README.it.md">🇮🇹 Italiano</a>
+</p>
 
-- Node.js 23.6 o superiore (usa `node:sqlite` e il supporto TypeScript nativo)
-- Un browser moderno. Per i file `.mkv` serve Chrome/Chromium/Edge: Safari non li riproduce.
+> **Neftlix does not provide any content.** It ships with no channels, playlists, servers or credentials. You connect the Xtream Codes account you already own; what you watch is your provider's responsibility. Neftlix is not affiliated with, endorsed by, or connected to Netflix, Inc.
 
-## Avvio
+---
+
+<!-- screenshots -->
+<p align="center">
+  <img src="docs/screenshots/home.png" width="800" alt="Home" />
+</p>
+<p align="center">
+  <img src="docs/screenshots/series.png" width="400" alt="Series" />
+  <img src="docs/screenshots/sport.png" width="400" alt="Sport" />
+</p>
+
+## Why
+
+Classic IPTV players are channel lists with a search box. Neftlix treats your provider's catalogue like a streaming service: a personalised home, "continue watching", series with seasons and episodes, favourites, a watchlist, football fixtures mapped to the channel that actually broadcasts them.
+
+## Features
+
+- **Connect your provider** with the Xtream Codes credentials you already have. Nothing leaves your machine.
+- **Home** built around what you do: resume, new episodes of the series you follow, watchlist, favourites, what's new, discovery rows that rotate daily.
+- **Movies & series** with posters, plot, cast, seasons → episodes, per-category search and sorting.
+- **Player** with resume position, episodes auto-marked as watched, "next episode", keyboard/remote shortcuts.
+- **Live TV** — every channel of your provider, with the programme now on air (XMLTV guide) and channel up/down in the player.
+- **Sport** — sport channels in one place, plus **fixtures**: official kick-off times from a football calendar, matched to the channel carrying the game. Live matches appear on the home page. No replays.
+- **Smart catalogue** — duplicates across categories are merged, dead sources are skipped automatically, TMDB ids and ratings survive flaky provider responses.
+- **Works everywhere** — responsive layout from phone to TV, D-pad navigation, installable as a PWA.
+
+## Quick start
+
+Requirements: [Node.js](https://nodejs.org) 23.6 or newer. Chrome/Chromium/Edge recommended (Safari cannot play `.mkv`).
 
 ```bash
+git clone https://github.com/c4rtical/neftlix.git
+cd neftlix
 npm install
 npm start
 ```
 
-Poi apri http://localhost:8787 e inserisci host, username e password del provider. La prima sincronizzazione scarica tutto il catalogo (circa 45 MB) e richiede pochi secondi.
+Open <http://localhost:8787>, enter your provider's host, username and password. The first sync downloads the whole catalogue (about 45 MB for 100k titles) and takes a few seconds.
 
-Per usarla da un altro dispositivo sulla stessa rete (TV, tablet, telefono) apri `http://<ip-del-mac>:8787` nel browser di quel dispositivo.
+Other devices on your network (TV, tablet, phone): open `http://<ip-of-this-machine>:8787`.
 
-## Sviluppo
+### Docker
 
 ```bash
-npm run dev          # server su :8787 con reload + Vite su :5173
-npm run build        # compila il frontend in web/dist (servito dal server)
+docker run -d --name neftlix -p 8787:8787 -v neftlix-data:/data ghcr.io/c4rtical/neftlix
 ```
 
-Variabili opzionali: `PORT` (default 8787), `NEFTLIX_DATA` (cartella dati, default `./data`), `LOG_LEVEL`.
+Or with Compose: `docker compose up -d` (see [`docker-compose.yml`](docker-compose.yml)).
 
-## Struttura
+### Configuration
 
-- `server/` — Node + Fastify. Client Xtream, cache del catalogo in SQLite, deduplicazione dei film, proxy degli stream, stato utente (progressi, visti, preferiti).
-- `web/` — React + Vite. Interfaccia navigabile con mouse, tastiera e telecomando (frecce, Invio, Esc).
-- `docs/xtream-findings.md` — note sul comportamento reale delle API Xtream.
-- `data/` — database locale (ignorato da git).
+All optional. Set as environment variables.
 
-## Sport / TV live
+| Variable | Default | Purpose |
+|---|---|---|
+| `PORT` | `8787` | HTTP port |
+| `HOST` | `0.0.0.0` | Bind address (`127.0.0.1` to keep it local) |
+| `NEFTLIX_DATA` | `./data` | Where the SQLite database lives |
+| `NEFTLIX_PASSWORD` | – | If set, the whole app asks for this password (HTTP basic auth). Use it when exposing Neftlix beyond your home network. |
+| `FOOTBALL_DATA_KEY` | – | Free [football-data.org](https://www.football-data.org/client/register) key for a richer fixtures calendar. Can also be set from Settings. |
+| `LOG_LEVEL` | `info` | Fastify log level |
 
-La sezione **Sport** mostra i canali live del provider nelle categorie sportive (Sky Sport, DAZN, Calcio, Eurosport…). Il pulsante "Tutti i canali TV" apre l'intera lista dei canali live. Nel player: ↑/↓ cambiano canale, l'overlay mostra il programma in onda (EPG) quando il provider lo fornisce.
+## Keyboard / remote
 
-Ogni canale mostra il programma in onda e quello successivo (guida XMLTV del provider, aggiornata ogni 6 ore).
+| Key | Action |
+|---|---|
+| Arrows | Move focus |
+| Enter | Open / play |
+| Esc, Backspace | Back |
+| In the player: ← → | Seek ±10 s |
+| In the player: ↑ ↓ | Seek ±60 s (live: next / previous channel) |
+| Space | Play / pause |
+| N | Next episode |
+| F | Fullscreen |
 
-La tab **Partite** parte dal calendario ufficiale (data e ora di calcio d'inizio) e cerca nella guida TV dei canali sport il programma che inizia in quella finestra e nomina entrambe le squadre: così vengono linkate solo le dirette, mai le repliche. La Home mostra le partite delle prossime 48 ore. Sorgenti del calendario: senza chiave, i dati gratuiti di TheSportsDB (Serie A, Champions, Europa League, Premier, Liga, Bundesliga, Ligue 1); con una chiave gratuita di football-data.org (Impostazioni → Calendario partite) il calendario è più completo. Le partite di Serie A senza canale in guida mostrano un collegamento alla categoria DAZN, per cui il provider non fornisce EPG.
+## How it works
 
-I canali vengono riprodotti in HLS tramite hls.js; il server riscrive le playlist e proxa i segmenti, così il browser non parla mai direttamente con il provider.
+```
+browser / TV ──HTTP──▶ Neftlix server (Node + Fastify + SQLite) ──▶ your Xtream provider
+                          │
+                          ├─ catalogue cache, dedup, search, home rows
+                          ├─ progress, watched, favourites, watchlist
+                          ├─ stream proxy (correct User-Agent, redirect handling, HLS rewrite)
+                          └─ XMLTV guide + fixtures ↔ channel matching
+```
 
-## Comandi da tastiera
+The browser never talks to the provider directly. Credentials stay in the local database.
 
-Frecce: naviga · Invio: apri · Esc/Backspace: indietro.
-Nel player: ←/→ ±10 s, ↑/↓ ±60 s (nei canali live: canale successivo/precedente), spazio play/pausa, N prossimo episodio, F schermo intero.
+- `server/` — Node 23 (native TypeScript, `node:sqlite`), Fastify.
+- `web/` — React + Vite, plain CSS, spatial navigation for remotes, hls.js for live TV.
+- `docs/xtream-findings.md` — notes on how real Xtream panels behave.
 
-## Limiti attuali
+## Roadmap
 
-- Solo protocollo Xtream Codes (niente M3U).
-- Canali live: nessun catch-up/archivio, nessuna guida EPG completa (solo il programma in onda e i successivi).
-- Riproduzione tramite `<video>` del browser: i file con audio AC3/DTS/E-AC3 possono risultare senza audio. Il rimedio (remux/transcodifica con ffmpeg) è previsto in una fase successiva.
-- Un solo profilo e un solo provider.
+- [ ] Audio remux for `.mkv` files with AC3/DTS tracks (browsers cannot decode them)
+- [ ] Automatic catalogue refresh
+- [ ] M3U playlists
+- [ ] Multiple profiles / providers
+- [ ] Native Android TV client on the same API
+
+See the [issues](https://github.com/c4rtical/neftlix/issues) for what is being worked on.
+
+## Contributing
+
+Bug reports with a sample of your panel's JSON are the most valuable thing you can send: every Xtream panel is slightly different. See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## License
+
+[MIT](LICENSE)
