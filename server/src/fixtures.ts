@@ -28,6 +28,7 @@ const CACHE_TTL = 3 * 3600;
 /** After a failed or partial load, try again soon instead of showing a stale/empty calendar for hours. */
 const ERROR_TTL = 5 * 60;
 let cache: { until: number; items: Fixture[] } | null = null;
+let inflight: Promise<Fixture[]> | null = null;
 
 // ---------- football-data.org (official, free key) ----------
 
@@ -208,34 +209,50 @@ export function setFixturesKey(db: Db, key: string | null) {
 
 export async function loadFixtures(db: Db, days = 7, force = false): Promise<Fixture[]> {
   if (!force && cache && now() < cache.until) return cache.items;
-  const key = getFixturesKey(db);
-  let items: Fixture[] = [];
-  fixtureState.error = null;
-  try {
-    if (key) {
-      items = await fetchFootballData(key, days);
-      fixtureState.source = 'football-data.org';
-    } else {
-      items = await fetchTheSportsDb(days);
-      fixtureState.source = 'TheSportsDB (senza chiave)';
-    }
-  } catch (e) {
-    fixtureState.error = e instanceof Error ? e.message : String(e);
-    if (key) {
-      // Key problem: fall back so the page still works.
-      try {
+  // Two cold-cache callers (e.g. Home's sport strip and the Sport page) must share one paced
+  // run instead of doubling the request rate; a `force` caller while one is in flight just joins it.
+  if (inflight) return inflight;
+  const run = async (): Promise<Fixture[]> => {
+    const key = getFixturesKey(db);
+    let items: Fixture[] = [];
+    fixtureState.error = null;
+    try {
+      if (key) {
+        items = await fetchFootballData(key, days);
+        fixtureState.source = 'football-data.org';
+      } else {
         items = await fetchTheSportsDb(days);
-        fixtureState.source = 'TheSportsDB (fallback)';
-      } catch {
-        /* keep error */
+        fixtureState.source = 'TheSportsDB (senza chiave)';
+      }
+    } catch (e) {
+      const keyError = e instanceof Error ? e.message : String(e);
+      fixtureState.error = keyError;
+      if (key) {
+        // Key problem: fall back so the page still works.
+        try {
+          items = await fetchTheSportsDb(days);
+          fixtureState.source = 'TheSportsDB (fallback)';
+          // fetchTheSportsDb may have overwritten fixtureState.error with a partial-calendar
+          // message; keep the key error too, so the user still sees why the key failed.
+          const partial = fixtureState.error !== keyError ? fixtureState.error : null;
+          fixtureState.error = `${keyError}${partial ? ` · ${partial}` : ''}`;
+        } catch {
+          /* keep error */
+        }
       }
     }
+    items.sort((a, b) => a.start - b.start);
+    cache = { until: now() + (fixtureState.error ? ERROR_TTL : CACHE_TTL), items };
+    fixtureState.lastRun = now();
+    fixtureState.count = items.length;
+    return items;
+  };
+  inflight = run();
+  try {
+    return await inflight;
+  } finally {
+    inflight = null;
   }
-  items.sort((a, b) => a.start - b.start);
-  cache = { until: now() + (fixtureState.error ? ERROR_TTL : CACHE_TTL), items };
-  fixtureState.lastRun = now();
-  fixtureState.count = items.length;
-  return items;
 }
 
 // ---------- Fixture → EPG channel matching ----------

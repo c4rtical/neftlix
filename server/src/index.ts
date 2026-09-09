@@ -10,6 +10,7 @@ import { registerApiRoutes } from './routes.ts';
 import { registerProfileRoutes } from './profiles.ts';
 import { registerStreamRoutes } from './stream.ts';
 import { EPG_REFRESH_SECS, epgState, refreshEpg } from './epg.ts';
+import { loadFixtures } from './fixtures.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = process.env.NEFTLIX_DATA ?? resolve(here, '../../data');
@@ -90,6 +91,9 @@ const epgTick = () => {
   const stale = !epgState.lastRun || Date.now() / 1000 - epgState.lastRun > EPG_REFRESH_SECS - 60;
   const empty = (db.prepare('SELECT COUNT(*) AS n FROM epg_programme WHERE stop > ?').get(Math.floor(Date.now() / 1000)) as { n: number }).n === 0;
   if (stale || empty) void refreshEpg(db, c);
+  // Warm the fixtures cache too, so the first user to open Home or Sport doesn't wait ~30s
+  // for the paced TheSportsDB loop. The request-time cache handles refresh from here on.
+  void loadFixtures(db, 14).catch(() => {});
 };
 setTimeout(epgTick, 3000);
 setInterval(epgTick, 30 * 60 * 1000).unref();

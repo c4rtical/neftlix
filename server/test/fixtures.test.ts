@@ -75,6 +75,27 @@ test('a 429 after some leagues keeps the partial calendar and reports it', async
   assert.match(fixtureState.error ?? '', /parziale/);
 });
 
+test('concurrent cold-cache calls share one in-flight run instead of doubling requests', async () => {
+  const league = (url: string) => {
+    if (url.includes('eventsnextleague.php?id=4332')) return { status: 200, body: { events: [ev('1', '3', 5)] } };
+    if (url.includes('eventsround.php?id=4332')) return { status: 200, body: { events: [ev('1', '3', 5)] } };
+    return { status: 200, body: { events: null } };
+  };
+
+  // Learn how many calls one pass makes.
+  const solo = fakeFetch(league);
+  const soloItems = await loadFixtures(openDb(':memory:'), 7, true);
+  assert.equal(soloItems.length, 1);
+  const callsPerPass = solo.calls.length;
+
+  // Two concurrent cold-cache callers must join the same in-flight run.
+  const f = fakeFetch(league);
+  const db = openDb(':memory:');
+  const [a, b] = await Promise.all([loadFixtures(db, 7, true), loadFixtures(db, 7, true)]);
+  assert.equal(f.calls.length, callsPerPass, 'the second concurrent call must not repeat the paced loop');
+  assert.equal(a, b, 'both callers get the same result array');
+});
+
 test('fetches every round inside the window, sequentially, without duplicates', async () => {
   const f = fakeFetch((url) => {
     if (url.includes('eventsnextleague.php?id=4332')) return { status: 200, body: { events: [ev('1', '3', 5), ev('3', '4', 100), ev('9', '9', 24 * 30)] } };
