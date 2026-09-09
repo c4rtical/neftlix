@@ -13,6 +13,7 @@
   <a href="https://github.com/c4rtical/neftlix/actions/workflows/ci.yml"><img src="https://github.com/c4rtical/neftlix/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="MIT license" /></a>
   <img src="https://img.shields.io/badge/node-%3E%3D23.6-brightgreen" alt="Node 23.6+" />
+  <a href="https://buymeacoffee.com/neftlix"><img src="https://img.shields.io/badge/buy%20me%20a%20coffee-ffdd00?logo=buymeacoffee&logoColor=black" alt="Buy me a coffee" /></a>
   <a href="#support-the-project"><img src="https://img.shields.io/badge/support-crypto-orange.svg" alt="Support the project" /></a>
 </p>
 
@@ -149,12 +150,17 @@ Bug reports with a sample of your panel's JSON are the most valuable thing you c
 
 ## Support the project
 
-Neftlix is free and will stay free. If it replaced a paid app for you and you feel like buying me a coffee, crypto is the easiest way:
+Neftlix is free and will stay free. If it replaced a paid app for you and you feel like buying me a coffee:
+
+<a href="https://buymeacoffee.com/neftlix"><img src="https://img.shields.io/badge/Buy%20me%20a%20coffee-neftlix-ffdd00?logo=buymeacoffee&logoColor=black" alt="Buy me a coffee" /></a>
+
+Or with crypto:
 
 | Network | Address |
 |---|---|
-| Solana (SOL, USDC) | `SOLANA_ADDRESS_COMING_SOON` |
-| EVM (Ethereum, Base, Arbitrum, Polygon, BNB — ETH, USDC, USDT) | `EVM_ADDRESS_COMING_SOON` |
+| Bitcoin | `bc1pkmu9ak0v5a2r7p0wpxn006xtqwhuvam4gl39g47n4623phg0f86sgjjzlq` |
+| Solana (SOL, USDC) | `7sEvuGqEwQmUDbZTdQYnmJJjvHmda6cnCBMya1Em2sSR` |
+| EVM (Ethereum, Base, Arbitrum, Polygon, BNB — ETH, USDC, USDT) | `0x4e5d74DBC7F46b29F587f573014F8D682446Ff4f` |
 
 Stars, bug reports and panel samples help just as much.
 
