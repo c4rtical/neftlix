@@ -40,7 +40,7 @@ export function Home({ status }: { status: Status }) {
     let alive = true;
     const load = () =>
       api
-        .liveMatches(1)
+        .liveMatches(1, true)
         .then((r) => {
           if (!alive) return;
           const at = Math.floor(Date.now() / 1000);

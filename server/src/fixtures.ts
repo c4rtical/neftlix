@@ -18,6 +18,9 @@ export type Fixture = {
   awayCrest?: string | null;
 };
 
+/** Competitions shown on the home "Sport adesso" strip. */
+export const MAIN_COMPETITIONS = new Set(['SA', 'CI', 'PL', 'PD', 'BL1', 'CL', 'EL']);
+
 export type FixtureState = { source: string | null; lastRun: number | null; count: number; error: string | null };
 export const fixtureState: FixtureState = { source: null, lastRun: null, count: 0, error: null };
 
@@ -70,6 +73,7 @@ async function fetchFootballData(key: string, days: number): Promise<Fixture[]> 
 const TSDB_BASE = 'https://www.thesportsdb.com/api/v1/json/123';
 const TSDB_LEAGUES: { id: string; code: string; name: string }[] = [
   { id: '4332', code: 'SA', name: 'Serie A' },
+  { id: '4506', code: 'CI', name: 'Coppa Italia' },
   { id: '4480', code: 'CL', name: 'UEFA Champions League' },
   { id: '4481', code: 'EL', name: 'UEFA Europa League' },
   { id: '4328', code: 'PL', name: 'Premier League' },

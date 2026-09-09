@@ -5,7 +5,7 @@ import { XtreamClient, decodeEpgText } from './xtream.ts';
 import { runSync, syncState, ensureEpisodes, ensureMovieDetail } from './sync.ts';
 import { epgState, nowNextFor } from './epg.ts';
 import { upcomingMatches } from './matches.ts';
-import { channelsForFixture, fallbackCategories, fixtureState, getFixturesKey, loadFixtures, setFixturesKey, sportCategoryIds } from './fixtures.ts';
+import { MAIN_COMPETITIONS, channelsForFixture, fallbackCategories, fixtureState, getFixturesKey, loadFixtures, setFixturesKey, sportCategoryIds } from './fixtures.ts';
 
 type Ctx = {
   db: Db;
@@ -455,8 +455,9 @@ export function registerApiRoutes(app: FastifyInstance, ctx: Ctx) {
 
   // Official fixtures mapped to live channels. `?epg=1` returns the old EPG-only heuristic instead.
   app.get('/api/live/matches', async (req) => {
-    const q = req.query as { days?: string; epg?: string; refresh?: string };
+    const q = req.query as { days?: string; epg?: string; refresh?: string; main?: string };
     const days = Math.min(Math.max(Number(q.days) || 7, 1), 14);
+    const onlyMain = q.main === '1';
     if (q.epg === '1') return { items: upcomingMatches(db, days), source: 'epg' };
     const fixtures = await loadFixtures(db, 14, q.refresh === '1');
     const at = now();
@@ -464,6 +465,7 @@ export function registerApiRoutes(app: FastifyInstance, ctx: Ctx) {
     const fallback = fallbackCategories(db);
     const items = fixtures
       .filter((f) => f.start >= at - 3 * 3600 && f.start <= at + days * 86400 && f.status !== 'POSTPONED' && f.status !== 'CANCELLED')
+      .filter((f) => !onlyMain || MAIN_COMPETITIONS.has(f.competitionCode))
       .map((f) => {
         const channels = channelsForFixture(db, f, cats);
         const live = f.status === 'IN_PLAY' || f.status === 'PAUSED' || (f.start <= at && at < f.start + 2 * 3600 && f.status !== 'FINISHED');

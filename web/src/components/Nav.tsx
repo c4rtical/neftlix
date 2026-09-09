@@ -1,14 +1,15 @@
 import { NavLink, useLocation } from 'react-router-dom';
+import { IconFilm, IconHeart, IconHome, IconSearch, IconSeries, IconSettings, IconSport, IconTv } from './Icons';
 
 const items = [
-  { to: '/', label: 'Home', icon: '⌂' },
-  { to: '/movies', label: 'Film', icon: '🎬' },
-  { to: '/series', label: 'Serie TV', icon: '📺' },
-  { to: '/live', label: 'Sport', icon: '⚽' },
-  { to: '/tv', label: 'TV', icon: '📡' },
-  { to: '/search', label: 'Cerca', icon: '⌕' },
-  { to: '/favorites', label: 'Preferiti', icon: '♥' },
-  { to: '/settings', label: 'Impostazioni', icon: '⚙' },
+  { to: '/', label: 'Home', icon: <IconHome /> },
+  { to: '/movies', label: 'Film', icon: <IconFilm /> },
+  { to: '/series', label: 'Serie TV', icon: <IconSeries /> },
+  { to: '/live', label: 'Sport', icon: <IconSport /> },
+  { to: '/tv', label: 'TV', icon: <IconTv /> },
+  { to: '/search', label: 'Cerca', icon: <IconSearch /> },
+  { to: '/favorites', label: 'Preferiti', icon: <IconHeart /> },
+  { to: '/settings', label: 'Impostazioni', icon: <IconSettings /> },
 ];
 
 export function Nav() {
