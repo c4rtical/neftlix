@@ -73,16 +73,31 @@ function createWindow(url: string) {
   if (state.maximized) win.maximize();
   trackWindowState(win, userData);
 
-  // Everything outside the local server opens in the system browser.
+  // Everything outside the local server opens in the system browser (and only if it's http/https).
   const origin = new URL(url).origin;
+  const isSameOrigin = (target: string): boolean => {
+    try {
+      return new URL(target).origin === origin;
+    } catch {
+      return false;
+    }
+  };
+  const openExternalIfWeb = (target: string) => {
+    try {
+      const proto = new URL(target).protocol;
+      if (proto === 'http:' || proto === 'https:') void shell.openExternal(target);
+    } catch {
+      /* invalid URL: nothing to open */
+    }
+  };
   win.webContents.setWindowOpenHandler(({ url: target }) => {
-    void shell.openExternal(target);
+    openExternalIfWeb(target);
     return { action: 'deny' };
   });
   win.webContents.on('will-navigate', (event, target) => {
-    if (!target.startsWith(origin)) {
+    if (!isSameOrigin(target)) {
       event.preventDefault();
-      void shell.openExternal(target);
+      openExternalIfWeb(target);
     }
   });
 
@@ -100,7 +115,7 @@ async function boot() {
   const webDist = join(import.meta.dirname, 'web');
   log(`Neftlix ${app.getVersion()} starting; data: ${dataDir}`);
   try {
-    server = await startServer(dataDir, webDist, DEBUG);
+    server = await startServer(dataDir, webDist, DEBUG, log);
     log(`server on ${server.url}`);
   } catch (e) {
     const msg = e instanceof Error ? (e.stack ?? e.message) : String(e);
@@ -117,7 +132,10 @@ if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
   app.on('second-instance', () => {
-    if (!win) return;
+    if (!win) {
+      if (server) createWindow(server.url);
+      return;
+    }
     if (win.isMinimized()) win.restore();
     win.focus();
   });
@@ -133,11 +151,15 @@ if (!app.requestSingleInstanceLock()) {
     if (process.platform !== 'darwin') app.quit();
   });
 
-  app.on('before-quit', () => {
-    if (server) {
-      const s = server;
-      server = null;
-      void s.close().catch(() => {});
-    }
+  let quitting = false;
+  app.on('before-quit', (event) => {
+    if (quitting || !server) return;
+    quitting = true;
+    const s = server;
+    server = null;
+    event.preventDefault();
+    void Promise.race([s.close().catch(() => {}), new Promise((resolve) => setTimeout(resolve, 2000))]).then(() => {
+      app.exit(0);
+    });
   });
 }

@@ -20,6 +20,7 @@ export function loadWindowState(userData: string): WindowState {
 export function trackWindowState(win: BrowserWindow, userData: string) {
   let timer: NodeJS.Timeout | null = null;
   const save = () => {
+    if (win.isDestroyed()) return;
     const maximized = win.isMaximized();
     const b = maximized ? win.getNormalBounds() : win.getBounds();
     const state: WindowState = { x: b.x, y: b.y, width: b.width, height: b.height, maximized };
@@ -37,5 +38,9 @@ export function trackWindowState(win: BrowserWindow, userData: string) {
   win.on('move', debounced);
   win.on('maximize', debounced);
   win.on('unmaximize', debounced);
-  win.on('close', save);
+  win.on('close', () => {
+    if (timer) clearTimeout(timer);
+    timer = null;
+    save();
+  });
 }
