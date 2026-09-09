@@ -7,6 +7,7 @@ import { dirname, resolve } from 'node:path';
 import { openDb } from './db.ts';
 import { XtreamClient } from './xtream.ts';
 import { registerApiRoutes } from './routes.ts';
+import { registerProfileRoutes } from './profiles.ts';
 import { registerStreamRoutes } from './stream.ts';
 import { EPG_REFRESH_SECS, epgState, refreshEpg } from './epg.ts';
 
@@ -57,6 +58,7 @@ if (PASSWORD) {
   app.log.info('password protection enabled (NEFTLIX_PASSWORD)');
 }
 
+registerProfileRoutes(app, db);
 registerApiRoutes(app, ctx);
 registerStreamRoutes(app, ctx);
 

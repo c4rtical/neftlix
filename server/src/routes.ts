@@ -6,6 +6,7 @@ import { runSync, syncState, ensureEpisodes, ensureMovieDetail } from './sync.ts
 import { epgState, nowNextFor } from './epg.ts';
 import { upcomingMatches } from './matches.ts';
 import { MAIN_COMPETITIONS, channelsForFixture, fallbackCategories, fixtureState, getFixturesKey, loadFixtures, setFixturesKey, sportCategoryIds } from './fixtures.ts';
+import { profileRow } from './profiles.ts';
 
 type Ctx = {
   db: Db;
@@ -65,7 +66,7 @@ export function registerApiRoutes(app: FastifyInstance, ctx: Ctx) {
       | { host: string; username: string; status: string; exp_date: number | null; max_connections: number | null; last_sync: number | null }
       | undefined;
 
-  app.get('/api/status', async () => {
+  app.get('/api/status', async (req) => {
     const account = accountRow();
     const counts = {
       movies: (db.prepare('SELECT COUNT(*) AS n FROM movie').get() as { n: number }).n,
@@ -74,6 +75,8 @@ export function registerApiRoutes(app: FastifyInstance, ctx: Ctx) {
     return {
       configured: Boolean(account),
       account: account ?? null,
+      profile: req.profileId === null ? null : (profileRow(db, req.profileId) ?? null),
+      profiles: (db.prepare('SELECT COUNT(*) AS n FROM profile').get() as { n: number }).n,
       sync: syncState,
       epg: epgState,
       fixtures: { ...fixtureState, hasKey: Boolean(getFixturesKey(db)) },
