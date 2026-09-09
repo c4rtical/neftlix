@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { api } from '../api';
 import type { Card, Category } from '../types';
 import { Grid } from '../components/Row';
+import { BrowseHeader, CategorySidebar } from '../components/BrowseHeader';
 
 const PAGE = 60;
 
@@ -85,42 +86,28 @@ export function Browse({ kind }: { kind: 'movie' | 'series' }) {
 
   return (
     <div className="page page-browse">
-      <aside className="cats">
-        <div className="cats-head">
-          <h3>{kind === 'movie' ? 'Film' : 'Serie TV'}</h3>
-          {cats.length > 15 && <input className="cats-filter" placeholder="Filtra categorie" value={catFilter} onChange={(e) => setCatFilter(e.target.value)} data-focus />}
-        </div>
-        <div className="cats-list">
-          <button className={`cat ${!category ? 'active' : ''}`} data-focus onClick={() => setParam('category', '')}>
-            Tutti
+      <CategorySidebar title={kind === 'movie' ? 'Film' : 'Serie TV'} filter={catFilter} onFilter={setCatFilter} showFilter={cats.length > 15}>
+        <button className={`cat ${!category ? 'active' : ''}`} data-focus onClick={() => setParam('category', '')}>
+          Tutti
+        </button>
+        {visibleCats.map((c) => (
+          <button key={c.id} className={`cat ${c.id === category ? 'active' : ''}`} data-focus onClick={() => setParam('category', c.id)}>
+            <span>{c.name}</span> <span className="cat-count">{c.count}</span>
           </button>
-          {visibleCats.map((c) => (
-            <button key={c.id} className={`cat ${c.id === category ? 'active' : ''}`} data-focus onClick={() => setParam('category', c.id)}>
-              {c.name} <span className="cat-count">{c.count}</span>
-            </button>
-          ))}
-        </div>
-      </aside>
+        ))}
+      </CategorySidebar>
       <div className="browse-main">
-        <div className="browse-head">
-          <h2>{current?.name ?? (kind === 'movie' ? 'Tutti i film' : 'Tutte le serie')}</h2>
-          <input
-            className="browse-search"
-            data-focus
-            type="search"
-            placeholder={current ? `Cerca in ${current.name}…` : kind === 'movie' ? 'Cerca tra tutti i film…' : 'Cerca tra tutte le serie…'}
-            value={qInput}
-            onChange={(e) => setQInput(e.target.value)}
-          />
-          <div className="sorts">
-            {SORTS.map((s) => (
-              <button key={s.id} className={`chip ${sort === s.id ? 'active' : ''}`} data-focus onClick={() => setParam('sort', s.id)}>
-                {s.label}
-              </button>
-            ))}
-            <span className="muted">{total.toLocaleString('it-IT')} titoli</span>
-          </div>
-        </div>
+        <BrowseHeader
+          title={current?.name ?? (kind === 'movie' ? 'Tutti i film' : 'Tutte le serie')}
+          placeholder={current ? `Cerca in ${current.name}…` : kind === 'movie' ? 'Cerca tra tutti i film…' : 'Cerca tra tutte le serie…'}
+          query={qInput}
+          onQuery={setQInput}
+          sorts={SORTS}
+          sort={sort}
+          onSort={(id) => setParam('sort', id)}
+          count={total}
+          countLabel="titoli"
+        />
         <Grid items={items} />
         <div ref={sentinel} className="sentinel">
           {loading ? 'Caricamento…' : ''}

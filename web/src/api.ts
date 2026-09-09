@@ -39,7 +39,7 @@ export const api = {
   episode: (id: string | number) => request<EpisodeDetail>(`/api/episodes/${id}`),
   search: (q: string) => request<{ movies: Card[]; series: Card[] }>(`/api/search${qs({ q })}`),
   liveCategories: (all = false) => request<Category[]>(`/api/live/categories${qs({ all: all ? '1' : undefined })}`),
-  liveChannels: (p: { category?: string; q?: string; sport?: '1'; limit?: number; offset?: number }) => request<{ total: number; items: LiveChannel[] }>(`/api/live/channels${qs(p)}`),
+  liveChannels: (p: { category?: string; q?: string; sport?: '1'; sort?: string; limit?: number; offset?: number }) => request<{ total: number; items: LiveChannel[] }>(`/api/live/channels${qs(p)}`),
   liveChannel: (id: string | number) => request<LiveChannelDetail>(`/api/live/channels/${id}`),
   liveEpg: (id: string | number) => request<{ items: EpgItem[] }>(`/api/live/epg/${id}`),
   liveMatches: (days = 7) => request<{ items: Match[]; source?: string | null; error?: string | null }>(`/api/live/matches${qs({ days })}`),

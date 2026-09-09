@@ -370,8 +370,9 @@ export function registerApiRoutes(app: FastifyInstance, ctx: Ctx) {
   });
 
   app.get('/api/live/channels', async (req) => {
-    const q = req.query as { category?: string; q?: string; sport?: string; limit?: string; offset?: string };
+    const q = req.query as { category?: string; q?: string; sport?: string; sort?: string; limit?: string; offset?: string };
     const limit = Math.min(Number(q.limit) || 200, 1000);
+    const order = q.sort === 'title' ? 'l.name COLLATE NOCASE, c.position' : 'c.position, l.num, l.name';
     const offset = Number(q.offset) || 0;
     const where: string[] = [];
     const params: unknown[] = [];
@@ -395,7 +396,7 @@ export function registerApiRoutes(app: FastifyInstance, ctx: Ctx) {
     const rows = db
       .prepare(`SELECT l.id, l.name, l.logo, l.category_id, l.archive, l.epg_channel_id, c.name AS category_name
                 FROM live_channel l LEFT JOIN category c ON c.kind = 'live' AND c.id = l.category_id
-                ${w} ORDER BY c.position, l.num, l.name LIMIT ? OFFSET ?`)
+                ${w} ORDER BY ${order} LIMIT ? OFFSET ?`)
       .all(...(params as never[]), limit, offset) as (Record<string, unknown> & { epg_channel_id: string | null })[];
     const at = now();
     const items = rows.map(({ epg_channel_id, ...r }) => ({ ...r, ...nowNextFor(db, epg_channel_id, at) }));
