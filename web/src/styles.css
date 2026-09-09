@@ -965,8 +965,8 @@ input {
 }
 .player-next {
   position: absolute;
-  right: 28px;
-  bottom: 90px;
+  right: 20px;
+  bottom: 64px;
   flex-direction: column;
   align-items: flex-start;
   gap: 2px;
@@ -987,13 +987,32 @@ input {
     transform: none;
   }
 }
-.player-next-btn {
-  margin-left: auto;
-  white-space: nowrap;
+/* Skip-to-next icon: bottom right, just above the native control bar, next to volume/fullscreen. */
+.player-next-icon {
+  position: absolute;
+  right: 20px;
+  bottom: 64px;
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  color: var(--fg);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s, background 0.15s;
+  pointer-events: none;
 }
-.player-channel-nav + .player-next-btn,
-.player-next-btn + .player-channel-nav {
-  margin-left: 0;
+.player.ui-visible .player-next-icon {
+  opacity: 1;
+  pointer-events: auto;
+}
+.player-next-icon:hover,
+.player-next-icon:focus {
+  background: rgba(255, 255, 255, 0.2);
+  outline: none;
 }
 .player-error {
   display: grid;
@@ -1076,7 +1095,7 @@ input {
 .player-epg {
   position: absolute;
   left: 24px;
-  bottom: 90px;
+  bottom: 64px;
   max-width: 560px;
   background: rgba(0, 0, 0, 0.65);
   border-radius: var(--radius);

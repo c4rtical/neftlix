@@ -273,12 +273,36 @@ export function Player() {
     }
   };
 
-  // After clicking a native control (e.g. the pause button), keyboard focus sits on that button:
-  // Space/Enter would then both run our toggle on keydown AND "click" the button on keyup, so the
-  // video restarts and pauses again. Cancelling the keyup suppresses the native activation.
-  const onKeyUp = (e: React.KeyboardEvent) => {
-    if (e.key === ' ' || e.key === 'Enter' || e.key === 'MediaPlayPause') e.preventDefault();
-  };
+  // Space / Enter / play-pause key: toggle exactly once. Chromium's native controls also react to
+  // these keys (a focused control button "clicks" on keyup, the element itself toggles on keydown),
+  // which used to double-toggle. Intercepting in the capture phase on window, before the event
+  // reaches the video or its shadow controls, and stopping it there leaves only our toggle.
+  useEffect(() => {
+    const isToggleKey = (k: string) => k === ' ' || k === 'Enter' || k === 'MediaPlayPause';
+    const onDown = (e: KeyboardEvent) => {
+      const v = videoRef.current;
+      if (!v || !isToggleKey(e.key) || document.activeElement !== v) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.repeat) return; // holding the key must not flicker between play and pause
+      poke();
+      if (v.paused) void v.play().catch(() => {});
+      else v.pause();
+    };
+    const onUp = (e: KeyboardEvent) => {
+      const v = videoRef.current;
+      if (!v || !isToggleKey(e.key) || document.activeElement !== v) return;
+      e.preventDefault();
+      e.stopPropagation();
+    };
+    window.addEventListener('keydown', onDown, true);
+    window.addEventListener('keyup', onUp, true);
+    return () => {
+      window.removeEventListener('keydown', onDown, true);
+      window.removeEventListener('keyup', onUp, true);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const onKey = (e: React.KeyboardEvent) => {
     const v = videoRef.current;
@@ -305,15 +329,6 @@ export function Player() {
       }
     }
     switch (e.key) {
-      case ' ':
-      case 'Enter':
-      case 'MediaPlayPause':
-        e.preventDefault();
-        // Holding the key repeats keydown; toggling on every repeat flickers between play and pause.
-        if (e.repeat) break;
-        if (v.paused) void v.play();
-        else v.pause();
-        break;
       case 'ArrowRight':
       case 'MediaFastForward':
         e.preventDefault();
@@ -387,7 +402,6 @@ export function Player() {
           onEnded={onEnded}
           onError={onError}
           onKeyDown={onKey}
-          onKeyUp={onKeyUp}
         />
       )}
       <div className="player-top">
@@ -399,11 +413,6 @@ export function Player() {
           <div>{meta?.title ?? 'Caricamento…'}</div>
           {meta?.subtitle && <div className="muted small">{meta.subtitle}</div>}
         </div>
-        {meta?.next && (
-          <button className="btn btn-ghost player-next-btn" onClick={goNext} title={`Prossimo episodio: ${meta.next.label} (N)`}>
-            Prossimo episodio ›
-          </button>
-        )}
         {isLive && (
           <div className="player-channel-nav">
             <button className="btn btn-ghost" onClick={() => goChannel(meta?.prevChannel)} title="Canale precedente (↓)">
@@ -433,6 +442,13 @@ export function Player() {
             </div>
           ))}
         </div>
+      )}
+      {meta?.next && !nearEnd && (
+        <button className="player-next-icon" onClick={goNext} title={`Prossimo episodio: ${meta.next.label} (N)`} aria-label="Prossimo episodio">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">
+            <path d="M6 5.5v13l9-6.5-9-6.5zM17 5h2v14h-2z" />
+          </svg>
+        </button>
       )}
       {meta?.next && nearEnd && (
         <button className="btn btn-primary player-next" onClick={goNext} title="Prossimo episodio (N)">
