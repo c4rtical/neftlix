@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "node --watch --no-warnings=ExperimentalWarning src/index.ts",
     "start": "node --no-warnings=ExperimentalWarning src/index.ts",
-    "check": "tsc --noEmit -p ."
+    "check": "tsc --noEmit -p .",
+    "test": "node --test --no-warnings=ExperimentalWarning 'test/**/*.test.ts'"
   },
   "dependencies": {
     "@fastify/static": "^8.0.0",

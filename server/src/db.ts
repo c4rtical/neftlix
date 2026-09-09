@@ -4,6 +4,11 @@ import { dirname } from 'node:path';
 
 export type Db = DatabaseSync;
 
+const USER_INDEXES = `
+CREATE INDEX IF NOT EXISTS progress_updated ON progress(profile_id, updated_at DESC);
+CREATE INDEX IF NOT EXISTS progress_series ON progress(profile_id, series_id);
+`;
+
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS meta (
   key TEXT PRIMARY KEY,
@@ -128,7 +133,15 @@ CREATE TABLE IF NOT EXISTS epg_programme (
 );
 CREATE INDEX IF NOT EXISTS epg_stop ON epg_programme(channel_id, stop);
 
+CREATE TABLE IF NOT EXISTS profile (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  avatar TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS progress (
+  profile_id INTEGER NOT NULL,
   item_type TEXT NOT NULL,      -- 'movie' | 'episode'
   item_id TEXT NOT NULL,        -- movie.key or episode.id
   series_id INTEGER,            -- denormalized for episodes
@@ -136,23 +149,23 @@ CREATE TABLE IF NOT EXISTS progress (
   duration INTEGER NOT NULL DEFAULT 0,
   watched INTEGER NOT NULL DEFAULT 0,
   updated_at INTEGER NOT NULL,
-  PRIMARY KEY (item_type, item_id)
+  PRIMARY KEY (profile_id, item_type, item_id)
 );
-CREATE INDEX IF NOT EXISTS progress_updated ON progress(updated_at DESC);
-CREATE INDEX IF NOT EXISTS progress_series ON progress(series_id);
 
 CREATE TABLE IF NOT EXISTS watchlist (
+  profile_id INTEGER NOT NULL,
   item_type TEXT NOT NULL,      -- 'movie' | 'series'
   item_id TEXT NOT NULL,
   created_at INTEGER NOT NULL,
-  PRIMARY KEY (item_type, item_id)
+  PRIMARY KEY (profile_id, item_type, item_id)
 );
 
 CREATE TABLE IF NOT EXISTS favorite (
+  profile_id INTEGER NOT NULL,
   item_type TEXT NOT NULL,      -- 'movie' | 'series'
   item_id TEXT NOT NULL,
   created_at INTEGER NOT NULL,
-  PRIMARY KEY (item_type, item_id)
+  PRIMARY KEY (profile_id, item_type, item_id)
 );
 `;
 
@@ -164,13 +177,54 @@ export function openDb(path: string): Db {
   db.exec('PRAGMA foreign_keys = ON');
   db.exec(SCHEMA);
   migrate(db);
+  // Run after migrate(): on a pre-profiles database, migrate() is what adds profile_id
+  // to `progress`, so these indexes can only be (re)created once that column exists.
+  db.exec(USER_INDEXES);
   return db;
 }
 
 /** Additive migrations for databases created by older versions. */
 function migrate(db: DatabaseSync) {
-  const cols = (db.prepare('PRAGMA table_info(category)').all() as { name: string }[]).map((c) => c.name);
-  if (!cols.includes('hidden')) db.exec('ALTER TABLE category ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0');
+  const columns = (table: string) => (db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]).map((c) => c.name);
+  if (!columns('category').includes('hidden')) db.exec('ALTER TABLE category ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0');
+  if (!columns('progress').includes('profile_id')) migrateProfiles(db);
+}
+
+/** 0.1.0 → profiles: user tables gain profile_id; existing data goes to profile 1 "Principale". */
+function migrateProfiles(db: DatabaseSync) {
+  const count = (table: string) => (db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get() as { n: number }).n;
+  const hasData = count('progress') + count('watchlist') + count('favorite') + count('account') > 0;
+  db.exec('BEGIN');
+  try {
+    db.exec(`
+      CREATE TABLE progress_new (
+        profile_id INTEGER NOT NULL, item_type TEXT NOT NULL, item_id TEXT NOT NULL, series_id INTEGER,
+        position INTEGER NOT NULL DEFAULT 0, duration INTEGER NOT NULL DEFAULT 0, watched INTEGER NOT NULL DEFAULT 0,
+        updated_at INTEGER NOT NULL, PRIMARY KEY (profile_id, item_type, item_id));
+      CREATE TABLE watchlist_new (
+        profile_id INTEGER NOT NULL, item_type TEXT NOT NULL, item_id TEXT NOT NULL, created_at INTEGER NOT NULL,
+        PRIMARY KEY (profile_id, item_type, item_id));
+      CREATE TABLE favorite_new (
+        profile_id INTEGER NOT NULL, item_type TEXT NOT NULL, item_id TEXT NOT NULL, created_at INTEGER NOT NULL,
+        PRIMARY KEY (profile_id, item_type, item_id));
+    `);
+    if (hasData) db.prepare('INSERT INTO profile (id, name, avatar, created_at) VALUES (1, ?, ?, ?)').run('Principale', 'red', now());
+    db.exec(`
+      INSERT INTO progress_new (profile_id, item_type, item_id, series_id, position, duration, watched, updated_at)
+        SELECT 1, item_type, item_id, series_id, position, duration, watched, updated_at FROM progress;
+      INSERT INTO watchlist_new (profile_id, item_type, item_id, created_at) SELECT 1, item_type, item_id, created_at FROM watchlist;
+      INSERT INTO favorite_new (profile_id, item_type, item_id, created_at) SELECT 1, item_type, item_id, created_at FROM favorite;
+      DROP TABLE progress; DROP TABLE watchlist; DROP TABLE favorite;
+      ALTER TABLE progress_new RENAME TO progress;
+      ALTER TABLE watchlist_new RENAME TO watchlist;
+      ALTER TABLE favorite_new RENAME TO favorite;
+    `);
+    db.exec(USER_INDEXES);
+    db.exec('COMMIT');
+  } catch (e) {
+    db.exec('ROLLBACK');
+    throw e;
+  }
 }
 
 export const now = () => Math.floor(Date.now() / 1000);
