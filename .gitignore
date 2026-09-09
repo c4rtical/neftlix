@@ -3,5 +3,6 @@ local.properties
 node_modules/
 data/
 web/dist/
+server/dist/
 .DS_Store
 .superpowers/
