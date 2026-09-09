@@ -824,6 +824,16 @@ input {
 .btn-danger:hover {
   background: #67161d;
 }
+.profiles-actions,
+.panel-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.panel-actions {
+  justify-content: flex-start;
+}
 .nav-avatar {
   display: grid;
   place-items: center;

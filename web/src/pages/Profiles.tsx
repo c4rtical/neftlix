@@ -48,6 +48,21 @@ export function Profiles({ current, onDone }: { current: Profile | null; onDone:
     }
   };
 
+  /** Forget the active profile on this device: the picker stays, in select mode. */
+  const signOut = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.deselectProfile();
+      nav('/profiles', { replace: true });
+      onDone();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Errore');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const save = async (e: FormEvent) => {
     e.preventDefault();
     if (!draft) return;
@@ -180,9 +195,16 @@ export function Profiles({ current, onDone }: { current: Profile | null; onDone:
         )}
       </div>
       {error && <div className="error">{error}</div>}
-      <button className="btn btn-ghost" data-focus type="button" onClick={() => setManage((m) => !m)}>
-        {manage ? 'Fine' : 'Gestisci profili'}
-      </button>
+      <div className="profiles-actions">
+        <button className="btn btn-ghost" data-focus type="button" onClick={() => setManage((m) => !m)}>
+          {manage ? 'Fine' : 'Gestisci profili'}
+        </button>
+        {current && !manage && (
+          <button className="btn btn-ghost" data-focus type="button" disabled={busy} onClick={signOut}>
+            Esci dal profilo
+          </button>
+        )}
+      </div>
     </div>
   );
 }

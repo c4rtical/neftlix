@@ -40,9 +40,24 @@ export function Settings({ status, onChanged }: { status: Status; onChanged: () 
   };
 
   const logout = async () => {
-    if (!confirm('Scollegare il provider? Progressi e preferiti restano salvati.')) return;
-    await api.logout();
-    onChanged();
+    if (!confirm('Scollegare il provider? Le credenziali Xtream verranno rimosse da questo server; profili, progressi e preferiti restano salvati.')) return;
+    setBusy(true);
+    try {
+      await api.logout();
+      onChanged();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const signOut = async () => {
+    setBusy(true);
+    try {
+      await api.deselectProfile();
+      onChanged();
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -56,9 +71,15 @@ export function Settings({ status, onChanged }: { status: Status; onChanged: () 
           <dt>Profili</dt>
           <dd>{status.profiles} su 5</dd>
         </dl>
-        <Link className="btn" data-focus to="/profiles?manage=1">
-          Gestisci profili
-        </Link>
+        <div className="panel-actions">
+          <Link className="btn" data-focus to="/profiles?manage=1">
+            Gestisci profili
+          </Link>
+          <button className="btn" data-focus onClick={signOut} disabled={busy}>
+            Esci dal profilo
+          </button>
+        </div>
+        <p className="muted small">Uscendo dal profilo questo dispositivo torna alla schermata "Chi sta guardando?".</p>
       </section>
       <section className="panel">
         <h3>Provider</h3>
@@ -74,9 +95,12 @@ export function Settings({ status, onChanged }: { status: Status; onChanged: () 
           <dt>Connessioni max</dt>
           <dd>{a?.max_connections ?? '—'}</dd>
         </dl>
-        <button className="btn" data-focus onClick={logout}>
-          Scollega provider
-        </button>
+        <div className="panel-actions">
+          <button className="btn btn-danger" data-focus onClick={logout} disabled={busy}>
+            Scollega provider
+          </button>
+        </div>
+        <p className="muted small">Rimuove host, username e password del provider da questo server. Per rientrare basterà reinserirli.</p>
       </section>
       <section className="panel">
         <h3>Catalogo</h3>
