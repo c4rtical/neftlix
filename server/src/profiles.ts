@@ -10,7 +10,7 @@ const NAME_MAX = 20;
 const COOKIE = 'neftlix_profile';
 const COOKIE_MAX_AGE = 365 * 24 * 3600;
 /** API paths usable without a profile (exact match or prefix + '/'). */
-const PUBLIC = ['/api/status', '/api/setup', '/api/sync', '/api/profiles', '/api/settings'];
+const PUBLIC = ['/api/status', '/api/setup', '/api/sync', '/api/profiles', '/api/settings', '/api/lan'];
 
 declare module 'fastify' {
   interface FastifyRequest {

@@ -11,6 +11,11 @@ contextBridge.exposeInMainWorld('neftlixDesktop', {
   download: () => ipcRenderer.invoke('update:download'),
   install: () => ipcRenderer.invoke('update:install'),
   quit: () => ipcRenderer.send('app:quit'),
+  lan: {
+    getState: () => ipcRenderer.invoke('lan:get-state'),
+    setEnabled: (enabled: boolean) => ipcRenderer.invoke('lan:set-enabled', enabled),
+    setPin: (pin: string) => ipcRenderer.invoke('lan:set-pin', pin),
+  },
   onState: (cb: (s: unknown) => void) => {
     const handler = (_e: unknown, s: unknown) => cb(s);
     ipcRenderer.on('update:state', handler);

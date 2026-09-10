@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import QRCode from 'qrcode';
 import { api } from '../api';
 import type { Status } from '../types';
-import { getDesktop, useUpdateState } from '../desktop';
+import { getDesktop, useUpdateState, type LanState } from '../desktop';
 
 function fmtDate(unix: number | null | undefined) {
   if (!unix) return '—';
@@ -11,6 +12,148 @@ function fmtDate(unix: number | null | undefined) {
 
 function fmtTime(ms: number) {
   return new Date(ms).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+}
+
+/** "Apri dalla TV" panel: the desktop server listens on the LAN so a TV browser can open Neftlix. */
+function LanPanel() {
+  const desktop = getDesktop();
+  const [state, setState] = useState<LanState | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [editingPin, setEditingPin] = useState(false);
+  const [pinDraft, setPinDraft] = useState('');
+  const [qr, setQr] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!desktop) return;
+    let alive = true;
+    desktop.lan
+      .getState()
+      .then((s) => alive && setState(s))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [desktop]);
+
+  const urls = state?.enabled ? state.addresses.map((a) => `http://${a}:${state.port}`) : [];
+  const first = urls[0] ?? null;
+  useEffect(() => {
+    if (!first) {
+      setQr(null);
+      return;
+    }
+    let alive = true;
+    QRCode.toString(first, { type: 'svg', margin: 1, color: { dark: '#000000', light: '#ffffff' } })
+      .then((svg) => alive && setQr(svg))
+      .catch(() => alive && setQr(null));
+    return () => {
+      alive = false;
+    };
+  }, [first]);
+
+  if (!desktop) return null;
+
+  const run = async (action: () => Promise<LanState>) => {
+    setBusy(true);
+    setError(null);
+    try {
+      setState(await action());
+    } catch (e) {
+      setError(e instanceof Error ? e.message.replace(/^.*Error: /, '') : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const savePin = async () => {
+    await run(() => desktop.lan.setPin(pinDraft));
+    setEditingPin(false);
+    setPinDraft('');
+  };
+
+  return (
+    <section className="panel">
+      <h3>Apri dalla TV</h3>
+      <p className="muted small">
+        Rende Neftlix raggiungibile dagli altri dispositivi della tua rete: TV, tablet, telefono. Sulla TV apri il browser e digita l'indirizzo
+        qui sotto, poi il PIN. Il computer deve restare acceso mentre guardi.
+      </p>
+      <dl>
+        <dt>Stato</dt>
+        <dd>{state ? (state.restarting ? 'Riavvio in corso…' : state.enabled ? 'Attivo' : 'Non attivo') : '—'}</dd>
+        {state?.enabled && (
+          <>
+            <dt>Indirizzo</dt>
+            <dd>
+              {urls.length === 0 ? (
+                <span className="muted">Nessuna rete trovata: collega il computer al Wi-Fi o al cavo di rete.</span>
+              ) : (
+                urls.map((u) => (
+                  <div key={u}>
+                    <code className="lan-url">{u}</code>
+                  </div>
+                ))
+              )}
+            </dd>
+            <dt>PIN</dt>
+            <dd>
+              {editingPin ? (
+                <span className="keyrow lan-pinrow">
+                  <input
+                    data-focus
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={8}
+                    placeholder="Da 4 a 8 cifre"
+                    value={pinDraft}
+                    onChange={(e) => setPinDraft(e.target.value.replace(/\D/g, ''))}
+                    autoFocus
+                  />
+                  <button className="btn btn-primary" data-focus onClick={savePin} disabled={busy || pinDraft.length < 4}>
+                    Salva
+                  </button>
+                  <button className="btn" data-focus onClick={() => setEditingPin(false)} disabled={busy}>
+                    Annulla
+                  </button>
+                </span>
+              ) : (
+                <span className="lan-pin">{state.pin}</span>
+              )}
+            </dd>
+          </>
+        )}
+      </dl>
+      {qr && (
+        <div className="lan-qr" dangerouslySetInnerHTML={{ __html: qr }} aria-label={`QR per ${first}`} title="Inquadra con il telefono o il tablet" />
+      )}
+      <div className="panel-actions">
+        <button
+          className={`btn ${state?.enabled ? '' : 'btn-primary'}`}
+          data-focus
+          onClick={() => run(() => desktop.lan.setEnabled(!state?.enabled))}
+          disabled={busy || !state || state.restarting}
+        >
+          {state?.enabled ? 'Disattiva' : 'Attiva'}
+        </button>
+        {state?.enabled && !editingPin && (
+          <button className="btn" data-focus onClick={() => setEditingPin(true)} disabled={busy}>
+            Cambia PIN
+          </button>
+        )}
+      </div>
+      {error && <p className="muted small lan-error">{error}</p>}
+      {state?.enabled && (
+        <p className="muted small">
+          {desktop.platform === 'win32'
+            ? 'Se Windows chiede il permesso al firewall, scegli "Consenti accesso" sulle reti private. '
+            : 'Se macOS chiede se accettare connessioni in entrata, scegli "Consenti". '}
+          La TV deve essere sulla stessa rete Wi-Fi del computer. Cambiare il PIN scollega tutti i dispositivi.
+        </p>
+      )}
+    </section>
+  );
 }
 
 /** "App desktop" panel: only rendered inside the Electron app, where `window.neftlixDesktop` exists. */
@@ -154,6 +297,7 @@ export function Settings({ status, onChanged }: { status: Status; onChanged: () 
     <div className="page page-settings">
       <h2>Impostazioni</h2>
       <DesktopUpdatePanel />
+      <LanPanel />
       <section className="panel">
         <h3>Profili</h3>
         <dl>

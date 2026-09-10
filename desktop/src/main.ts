@@ -1,6 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, shell, type MenuItemConstructorOptions } from 'electron';
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { lanAddresses, loadLanState, PIN_RE, saveLanState, type LanState } from './lan.js';
 import { startServer, type RunningServer } from './server.js';
 import { createUpdater, type Updater, type UpdaterDeps } from './updater.js';
 import { loadWindowState, trackWindowState } from './window-state.js';
@@ -11,6 +12,9 @@ const DEBUG = process.env.NEFTLIX_DEBUG === '1';
 let server: RunningServer | null = null;
 let win: BrowserWindow | null = null;
 let updater: Updater | null = null;
+let lan: LanState = { enabled: false, pin: '', secret: '' };
+let lanFile = '';
+let restarting: Promise<void> | null = null;
 
 function log(line: string) {
   const msg = `${new Date().toISOString()} ${line}`;
@@ -124,15 +128,72 @@ function createWindow(url: string) {
   void win.loadURL(url);
 }
 
+/** What the Settings panel shows: switch, PIN and the addresses a TV can type. */
+function lanPublicState() {
+  return {
+    enabled: lan.enabled,
+    pin: lan.pin,
+    port: server?.port ?? 0,
+    addresses: lan.enabled ? lanAddresses() : [],
+    restarting: restarting !== null,
+  };
+}
+
+function launch(dataDir: string, webDist: string) {
+  return startServer(dataDir, webDist, DEBUG, log, {
+    host: lan.enabled ? '0.0.0.0' : '127.0.0.1',
+    lan: { secret: lan.secret, getPin: () => lan.pin },
+  });
+}
+
+/** Switching "Apri dalla TV" re-binds the server (same port, other host) and reloads the window. */
+async function setLanEnabled(enabled: boolean, dataDir: string, webDist: string) {
+  if (restarting) await restarting;
+  if (lan.enabled === enabled || !server) return lanPublicState();
+  restarting = (async () => {
+    const old = server;
+    server = null;
+    lan = { ...lan, enabled };
+    saveLanState(lanFile, lan);
+    if (old) await old.close().catch(() => {});
+    try {
+      server = await launch(dataDir, webDist);
+    } catch (e) {
+      // Could not bind on the LAN (port taken, firewall): fall back to loopback and report it.
+      const msg = e instanceof Error ? e.message : String(e);
+      log(`lan restart failed (${msg}); back to loopback`);
+      lan = { ...lan, enabled: false };
+      saveLanState(lanFile, lan);
+      server = await launch(dataDir, webDist);
+    }
+    log(`server on ${server.url} (${server.host})`);
+    win?.webContents.reload();
+  })();
+  try {
+    await restarting;
+  } finally {
+    restarting = null;
+  }
+  return lanPublicState();
+}
+
 async function boot() {
   const userData = app.getPath('userData');
   const dataDir = join(userData, 'data');
   mkdirSync(dataDir, { recursive: true });
   const webDist = join(import.meta.dirname, 'web');
-  log(`Neftlix ${app.getVersion()} starting; data: ${dataDir}`);
+  lanFile = join(userData, 'lan.json');
+  lan = loadLanState(lanFile);
+  // Persist right away so the generated PIN and secret stay the same across launches.
   try {
-    server = await startServer(dataDir, webDist, DEBUG, log);
-    log(`server on ${server.url}`);
+    saveLanState(lanFile, lan);
+  } catch (e) {
+    log(`cannot write lan.json: ${e instanceof Error ? e.message : String(e)}`);
+  }
+  log(`Neftlix ${app.getVersion()} starting; data: ${dataDir}; lan: ${lan.enabled ? 'on' : 'off'}`);
+  try {
+    server = await launch(dataDir, webDist);
+    log(`server on ${server.url} (${server.host})`);
   } catch (e) {
     const msg = e instanceof Error ? (e.stack ?? e.message) : String(e);
     log(`server failed: ${msg}`);
@@ -166,6 +227,15 @@ async function boot() {
   ipcMain.handle('update:download', () => upd.download());
   ipcMain.handle('update:install', () => upd.install());
   ipcMain.on('app:quit', () => app.quit());
+  ipcMain.handle('lan:get-state', () => lanPublicState());
+  ipcMain.handle('lan:set-enabled', (_e, enabled: unknown) => setLanEnabled(enabled === true, dataDir, webDist));
+  ipcMain.handle('lan:set-pin', (_e, pin: unknown) => {
+    const value = String(pin ?? '').trim();
+    if (!PIN_RE.test(value)) throw new Error('Il PIN deve avere da 4 a 8 cifre');
+    lan = { ...lan, pin: value };
+    saveLanState(lanFile, lan);
+    return lanPublicState();
+  });
   upd.onState((s) => win?.webContents.send('update:state', s));
 
   buildMenu(dataDir);

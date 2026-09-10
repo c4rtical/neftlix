@@ -14,6 +14,16 @@ export type UpdateState = {
   manual: boolean;
 };
 
+/** Shared with `desktop/src/main.ts` (`lanPublicState`) — keep in sync. */
+export type LanState = {
+  enabled: boolean;
+  pin: string;
+  port: number;
+  /** IPv4 addresses a TV can type, empty when disabled. */
+  addresses: string[];
+  restarting: boolean;
+};
+
 export type NeftlixDesktop = {
   version: string;
   platform: string;
@@ -22,6 +32,11 @@ export type NeftlixDesktop = {
   download(): Promise<UpdateState>;
   install(): Promise<void>;
   quit(): void;
+  lan: {
+    getState(): Promise<LanState>;
+    setEnabled(enabled: boolean): Promise<LanState>;
+    setPin(pin: string): Promise<LanState>;
+  };
   onState(cb: (s: UpdateState) => void): () => void;
   onNavigate(cb: (path: string) => void): () => void;
 };

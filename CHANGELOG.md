@@ -4,6 +4,10 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Added
+- Desktop app: "Apri dalla TV" in Settings. The bundled server listens on the LAN so a TV browser, tablet or phone on the same network can open Neftlix at the shown address; other devices enter a 6-digit PIN once (cookie), five wrong PINs lock the address for 30 s, changing the PIN signs every device out. The app window itself is never challenged. Addresses and a QR code are shown in the panel; the state survives restarts.
+- Server: `createApp({ lan })` option behind the feature (PIN page, `POST /api/lan/login`), independent from `NEFTLIX_PASSWORD`.
+
 ## [0.3.0] - 2026-09-10
 
 ### Added

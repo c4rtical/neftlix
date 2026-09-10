@@ -48,6 +48,10 @@ The app runs the same server described below on your machine (127.0.0.1 only) an
 
 The app checks GitHub Releases for updates: on Windows it installs them in one click, on macOS it downloads the new dmg and opens it (until the app is signed).
 
+### Watch on your TV
+
+Settings → **Apri dalla TV** → *Attiva*. The app shows an address such as `http://192.168.1.20:53412` and a 6-digit PIN: open that address in the TV's browser (LG, Samsung, Fire TV Silk, any tablet or phone on the same Wi-Fi), enter the PIN once, and pick a profile. The computer stays the brain (catalogue, guide, progress) and must stay on while you watch; the video itself goes from your provider straight to the TV. Windows asks once to allow Neftlix through the firewall on private networks. A native Android TV / Fire TV app is next on the roadmap.
+
 Prefer a browser on your TV or phone? Run the server on a PC or NAS instead (see *Quick start* below) and open it from any device on your network.
 
 ## Why
@@ -140,7 +144,8 @@ The browser never talks to the provider directly. Credentials stay in the local 
 - [ ] Automatic catalogue refresh
 - [ ] M3U playlists
 - [ ] Multiple providers
-- [ ] Native Android TV client on the same API
+- [x] Open from the TV browser (LAN switch in the desktop app)
+- [ ] Native Android TV / Fire TV client on the same API
 - [ ] Signed and notarized desktop builds with auto-update
 - [ ] Linux AppImage
 

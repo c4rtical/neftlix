@@ -8,6 +8,7 @@ import { XtreamClient } from './xtream.ts';
 import { registerApiRoutes } from './routes.ts';
 import { registerProfileRoutes } from './profiles.ts';
 import { registerStreamRoutes } from './stream.ts';
+import { registerLan, type LanOptions } from './lan.ts';
 import { EPG_REFRESH_SECS, epgState, refreshEpg } from './epg.ts';
 import { loadFixtures } from './fixtures.ts';
 
@@ -20,6 +21,8 @@ export type AppOptions = {
   password?: string;
   /** Fastify/pino log level, default 'info'. */
   logLevel?: string;
+  /** "Apri dalla TV": clients that are not on loopback must enter this PIN once (cookie). */
+  lan?: LanOptions;
 };
 
 export type AppHandle = {
@@ -74,6 +77,8 @@ export async function createApp(opts: AppOptions): Promise<AppHandle> {
     app.log.info('password protection enabled');
   }
 
+  // Before the profile guard: a TV without the LAN cookie must see the PIN page, not NO_PROFILE.
+  if (opts.lan) registerLan(app, opts.lan);
   registerProfileRoutes(app, db);
   registerApiRoutes(app, ctx);
   registerStreamRoutes(app, ctx);
