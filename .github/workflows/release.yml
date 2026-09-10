@@ -22,6 +22,7 @@ jobs:
     outputs:
       release: ${{ steps.decide.outputs.release }}
       tag: ${{ steps.decide.outputs.tag }}
+      version: ${{ steps.decide.outputs.version }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -32,6 +33,7 @@ jobs:
           VERSION=$(node -p "require('./package.json').version")
           TAG="v$VERSION"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           if [ "${GITHUB_REF}" = "refs/tags/$TAG" ]; then
             echo "release=true" >> "$GITHUB_OUTPUT"; exit 0
           fi
@@ -44,6 +46,26 @@ jobs:
           git tag -a "$TAG" -m "Neftlix $VERSION"
           git push origin "$TAG"
           echo "release=true" >> "$GITHUB_OUTPUT"
+      # One draft, created here before the matrix starts: when each electron-builder job
+      # creates its own, the macOS and Windows runs race and end up with two drafts for the
+      # same tag. The notes are the CHANGELOG section of this version.
+      - name: Create the draft release with the changelog notes
+        if: steps.decide.outputs.release == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.decide.outputs.tag }}
+          VERSION: ${{ steps.decide.outputs.version }}
+        run: |
+          if gh release view "$TAG" --json id >/dev/null 2>&1; then
+            echo "Release $TAG already exists."; exit 0
+          fi
+          awk -v v="$VERSION" '
+            index($0, "## [" v "]") == 1 { on = 1; next }
+            /^## \[/ { on = 0 }
+            on { print }
+          ' CHANGELOG.md | sed -e :a -e '/^\n*$/{$d;N;ba' -e '}' > notes.md
+          [ -s notes.md ] || echo "Neftlix $VERSION" > notes.md
+          gh release create "$TAG" --draft --title "Neftlix $VERSION" --notes-file notes.md
 
   desktop:
     needs: version
