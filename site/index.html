@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Neftlix — your IPTV subscription, the Netflix way</title>
+  <meta name="description" content="Neftlix is a free, open-source, Netflix-style client for the Xtream IPTV provider you already have: movies, series, live TV and sport. Runs on your computer." />
+  <meta name="theme-color" content="#0b0b0f" />
+  <link rel="icon" href="assets/icon-192.png" />
+  <link rel="apple-touch-icon" href="assets/icon-192.png" />
+  <meta property="og:title" content="Neftlix" />
+  <meta property="og:description" content="A Netflix-style client for the IPTV provider you already have. Free and open source." />
+  <meta property="og:image" content="https://neftlix.tv/assets/home.jpg" />
+  <meta property="og:url" content="https://neftlix.tv/" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0b0b0f;
+      --fg: #f2f2f5;
+      --muted: #b3b3c0;
+      --accent: #e50914;
+      --accent-hover: #f6121d;
+      --radius: 6px;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; overflow-x: hidden; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      overflow: hidden;
+    }
+
+    /* Tilted wall of app screens, like the poster wall behind the Netflix hero. */
+    .backdrop { position: fixed; inset: 0; z-index: 0; overflow: hidden; }
+    .wall {
+      position: absolute; inset: -25vh -25vw;
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: clamp(8px, 1vw, 16px);
+      transform: perspective(1400px) rotateX(14deg) rotateZ(-6deg) scale(1.15);
+      transform-origin: center;
+      opacity: .8;
+    }
+    .wall figure {
+      margin: 0; aspect-ratio: 16 / 9; overflow: hidden;
+      border-radius: 8px; background: #17171d;
+      box-shadow: 0 8px 30px rgba(0,0,0,.6);
+    }
+    .wall img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .wall figure:nth-child(3n) img   { object-position: left top; }
+    .wall figure:nth-child(3n+1) img { object-position: center; }
+    .wall figure:nth-child(3n+2) img { object-position: right bottom; }
+    .shade {
+      position: fixed; inset: 0; z-index: 1;
+      background:
+        radial-gradient(ellipse at center, rgba(11,11,15,.45) 0%, rgba(11,11,15,.8) 60%, rgba(11,11,15,.97) 100%),
+        linear-gradient(to bottom, rgba(11,11,15,.85) 0%, rgba(11,11,15,.35) 30%, rgba(11,11,15,.35) 70%, rgba(11,11,15,.95) 100%);
+    }
+
+    .page {
+      position: relative; z-index: 2;
+      min-height: 100dvh;
+      display: grid; grid-template-rows: auto 1fr auto;
+      padding-inline: clamp(16px, 4vw, 56px);
+    }
+
+    header {
+      display: flex; align-items: center; justify-content: space-between; gap: 16px;
+      padding-block: clamp(14px, 2.5vh, 28px);
+    }
+    .brand { display: flex; align-items: center; gap: 12px; text-decoration: none; color: inherit; }
+    .brand img { width: 40px; height: 40px; border-radius: 8px; }
+    .brand span {
+      font-family: 'Bebas Neue', Impact, 'Arial Narrow', sans-serif;
+      font-size: clamp(30px, 4vw, 44px); letter-spacing: .04em; line-height: 1;
+      color: var(--accent); text-shadow: 0 2px 12px rgba(229,9,20,.35);
+    }
+    .actions { display: flex; align-items: center; gap: 12px; }
+
+    .lang {
+      appearance: none; -webkit-appearance: none;
+      background: rgba(0,0,0,.45) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 10px center / 16px;
+      color: var(--fg); border: 1px solid rgba(255,255,255,.45); border-radius: 4px;
+      padding: 8px 34px 8px 12px; font: inherit; font-size: 15px; cursor: pointer;
+    }
+    .lang:hover { border-color: #fff; }
+
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+      padding: 12px 22px; border-radius: 4px; border: 1px solid transparent;
+      font: inherit; font-weight: 600; font-size: 16px; text-decoration: none; color: #fff;
+      cursor: pointer; white-space: nowrap; transition: background .15s, border-color .15s, transform .05s;
+    }
+    .btn:active { transform: translateY(1px); }
+    .btn-accent { background: var(--accent); }
+    .btn-accent:hover { background: var(--accent-hover); }
+    .btn-ghost { background: rgba(109,109,110,.35); border-color: rgba(255,255,255,.25); }
+    .btn-ghost:hover { background: rgba(109,109,110,.55); border-color: rgba(255,255,255,.5); }
+    .btn svg { width: 20px; height: 20px; flex: none; }
+    .btn small { font-weight: 400; opacity: .8; font-size: 13px; }
+
+    main {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      text-align: center; padding-block: 2vh;
+    }
+    h1 {
+      margin: 0; max-width: 20ch;
+      font-size: clamp(34px, 5.2vw, 68px); font-weight: 900; line-height: 1.08; letter-spacing: -.01em;
+      text-shadow: 0 2px 20px rgba(0,0,0,.6);
+    }
+    .lede {
+      margin: clamp(14px, 2vh, 22px) 0 0; max-width: 62ch;
+      font-size: clamp(17px, 1.6vw, 22px); line-height: 1.45; color: var(--fg);
+    }
+    .note {
+      margin: clamp(10px, 1.6vh, 18px) 0 0; max-width: 62ch;
+      font-size: clamp(14px, 1.15vw, 16px); color: var(--muted); line-height: 1.5;
+    }
+    .downloads {
+      display: flex; flex-wrap: wrap; gap: 12px; justify-content: center;
+      margin-top: clamp(22px, 3.5vh, 36px);
+    }
+    .downloads .btn { padding: 14px 26px; font-size: 17px; flex-direction: column; gap: 2px; line-height: 1.15; }
+    .downloads .btn .row { display: inline-flex; align-items: center; gap: 10px; }
+    .alt {
+      margin-top: 14px; font-size: 14px; color: var(--muted);
+    }
+    .alt a { color: var(--fg); text-decoration: underline; text-underline-offset: 3px; }
+    .alt a:hover { color: #fff; }
+
+    footer {
+      display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 6px 22px;
+      padding-block: clamp(12px, 2.5vh, 24px);
+      font-size: 13px; color: var(--muted);
+    }
+    footer a { color: var(--muted); text-decoration: none; }
+    footer a:hover { color: #fff; text-decoration: underline; text-underline-offset: 3px; }
+    .disclaimer { flex-basis: 100%; text-align: center; font-size: 12px; opacity: .8; }
+
+    :focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+
+    @media (max-width: 720px) {
+      body { overflow: auto; }
+      .wall { grid-template-columns: repeat(4, 1fr); inset: -25vh -50vw; }
+      .brand img { width: 32px; height: 32px; }
+      .actions .btn-ghost span { display: none; }
+      .downloads { width: 100%; }
+      .downloads .btn { width: 100%; }
+    }
+    @media (max-height: 640px) {
+      .wall { display: none; }
+    }
+    @media (prefers-reduced-motion: no-preference) {
+      .wall { animation: drift 60s linear infinite alternate; }
+      @keyframes drift {
+        from { transform: perspective(1400px) rotateX(14deg) rotateZ(-6deg) scale(1.15) translateY(0); }
+        to   { transform: perspective(1400px) rotateX(14deg) rotateZ(-6deg) scale(1.15) translateY(-3%); }
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="backdrop" aria-hidden="true">
+  <div class="wall">
+    <figure><img src="assets/home.jpg" alt="" /></figure>
+    <figure><img src="assets/movies.jpg" alt="" /></figure>
+    <figure><img src="assets/sport.jpg" alt="" /></figure>
+    <figure><img src="assets/series.jpg" alt="" /></figure>
+    <figure><img src="assets/profiles.jpg" alt="" /></figure>
+    <figure><img src="assets/home.jpg" alt="" /></figure>
+    <figure><img src="assets/series.jpg" alt="" /></figure>
+    <figure><img src="assets/home.jpg" alt="" /></figure>
+    <figure><img src="assets/movies.jpg" alt="" /></figure>
+    <figure><img src="assets/profiles.jpg" alt="" /></figure>
+    <figure><img src="assets/sport.jpg" alt="" /></figure>
+    <figure><img src="assets/series.jpg" alt="" /></figure>
+    <figure><img src="assets/movies.jpg" alt="" /></figure>
+    <figure><img src="assets/sport.jpg" alt="" /></figure>
+    <figure><img src="assets/home.jpg" alt="" /></figure>
+    <figure><img src="assets/series.jpg" alt="" /></figure>
+    <figure><img src="assets/movies.jpg" alt="" /></figure>
+    <figure><img src="assets/profiles.jpg" alt="" /></figure>
+    <figure><img src="assets/sport.jpg" alt="" /></figure>
+    <figure><img src="assets/home.jpg" alt="" /></figure>
+    <figure><img src="assets/profiles.jpg" alt="" /></figure>
+    <figure><img src="assets/series.jpg" alt="" /></figure>
+    <figure><img src="assets/movies.jpg" alt="" /></figure>
+    <figure><img src="assets/home.jpg" alt="" /></figure>
+  </div>
+  </div>
+  <div class="shade" aria-hidden="true"></div>
+
+  <div class="page">
+    <header>
+      <a class="brand" href="/" aria-label="Neftlix">
+        <img src="assets/logo.svg" alt="" />
+        <span>NEFTLIX</span>
+      </a>
+      <div class="actions">
+        <select class="lang" id="lang" aria-label="Language">
+          <option value="en">English</option>
+          <option value="it">Italiano</option>
+        </select>
+        <a class="btn btn-ghost" href="https://github.com/c4rtical/neftlix" rel="noopener">
+          <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+          <span data-i18n="github">GitHub</span>
+        </a>
+      </div>
+    </header>
+
+    <main>
+      <h1 data-i18n="title">Your IPTV subscription, the Netflix way.</h1>
+      <p class="lede" data-i18n="lede">Movies, series, live TV and sport from the Xtream provider you already have. Free, open source, runs on your computer.</p>
+      <p class="note" data-i18n="note">Neftlix ships with no channels or content: you sign in with the Xtream Codes account your IPTV provider gave you.</p>
+
+      <div class="downloads">
+        <a class="btn btn-accent" id="dl-mac" href="https://github.com/c4rtical/neftlix/releases/latest" rel="noopener">
+          <span class="row">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.37 12.6c-.02-2.3 1.88-3.4 1.96-3.45-1.07-1.56-2.73-1.78-3.32-1.8-1.41-.14-2.76.83-3.48.83-.72 0-1.83-.81-3-.79-1.55.02-2.97.9-3.77 2.28-1.61 2.79-.41 6.92 1.16 9.18.77 1.11 1.68 2.35 2.88 2.31 1.16-.05 1.6-.75 3-.75s1.79.75 3.01.72c1.24-.02 2.03-1.13 2.79-2.24.88-1.29 1.24-2.53 1.26-2.6-.03-.01-2.42-.93-2.44-3.69zM14.1 5.86c.64-.77 1.07-1.85.95-2.92-.92.04-2.03.61-2.69 1.38-.59.68-1.11 1.78-.97 2.83 1.03.08 2.07-.52 2.71-1.29z"/></svg>
+            <span data-i18n="dlMac">Download for macOS</span>
+          </span>
+          <small id="meta-mac">&nbsp;</small>
+        </a>
+        <a class="btn btn-accent" id="dl-win" href="https://github.com/c4rtical/neftlix/releases/latest" rel="noopener">
+          <span class="row">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 5.5 10.5 4.5v7.1H3zm0 13 7.5 1V12.5H3zm8.5 1.2L21 21V12.5h-9.5zm0-15.4v7.3H21V3z"/></svg>
+            <span data-i18n="dlWin">Download for Windows</span>
+          </span>
+          <small id="meta-win">&nbsp;</small>
+        </a>
+      </div>
+      <p class="alt">
+        <span data-i18n="altPre">Linux, Docker or from source:</span>
+        <a href="https://github.com/c4rtical/neftlix#quick-start" rel="noopener" data-i18n="altLink">see the README</a>
+        · <a href="https://github.com/c4rtical/neftlix/releases" rel="noopener" data-i18n="allReleases">all releases</a>
+      </p>
+    </main>
+
+    <footer>
+      <span id="version-line">Neftlix</span>
+      <a href="https://github.com/c4rtical/neftlix/blob/main/LICENSE" rel="noopener">MIT</a>
+      <a href="https://github.com/c4rtical/neftlix/blob/main/CHANGELOG.md" rel="noopener" data-i18n="changelog">Changelog</a>
+      <a href="https://github.com/c4rtical/neftlix/issues" rel="noopener" data-i18n="issues">Report a problem</a>
+      <a href="https://buymeacoffee.com/neftlix" rel="noopener">☕ Buy me a coffee</a>
+      <a href="https://github.com/c4rtical/neftlix#support-the-project" rel="noopener" data-i18n="crypto">Crypto</a>
+      <span class="disclaimer" data-i18n="disclaimer">Neftlix is an independent open-source project. It is not affiliated with, endorsed by, or connected to Netflix, Inc., and it provides no content of its own.</span>
+    </footer>
+  </div>
+
+  <script>
+    (function () {
+      var REPO = 'c4rtical/neftlix';
+      var RELEASES = 'https://github.com/' + REPO + '/releases/latest';
+
+      var STR = {
+        en: {
+          title: 'Your IPTV subscription, the Netflix way.',
+          lede: 'Movies, series, live TV and sport from the Xtream provider you already have. Free, open source, runs on your computer.',
+          note: 'Neftlix ships with no channels or content: you sign in with the Xtream Codes account your IPTV provider gave you.',
+          dlMac: 'Download for macOS', dlWin: 'Download for Windows',
+          altPre: 'Linux, Docker or from source:', altLink: 'see the README', allReleases: 'all releases',
+          github: 'GitHub', changelog: 'Changelog', issues: 'Report a problem', crypto: 'Crypto',
+          disclaimer: 'Neftlix is an independent open-source project. It is not affiliated with, endorsed by, or connected to Netflix, Inc., and it provides no content of its own.',
+          version: 'Neftlix {v}', versionUnknown: 'Neftlix', size: '{mb} MB'
+        },
+        it: {
+          title: 'Il tuo abbonamento IPTV, in stile Netflix.',
+          lede: 'Film, serie, TV in diretta e sport dal provider Xtream che hai già. Gratis, open source, gira sul tuo computer.',
+          note: 'Neftlix non include canali né contenuti: accedi con l’account Xtream Codes che ti ha dato il tuo provider IPTV.',
+          dlMac: 'Scarica per macOS', dlWin: 'Scarica per Windows',
+          altPre: 'Linux, Docker o da sorgente:', altLink: 'leggi il README', allReleases: 'tutte le versioni',
+          github: 'GitHub', changelog: 'Novità', issues: 'Segnala un problema', crypto: 'Crypto',
+          disclaimer: 'Neftlix è un progetto open source indipendente. Non è affiliato, sponsorizzato o collegato a Netflix, Inc. e non fornisce alcun contenuto proprio.',
+          version: 'Neftlix {v}', versionUnknown: 'Neftlix', size: '{mb} MB'
+        }
+      };
+
+      var lang = 'en';
+      try { lang = localStorage.getItem('lang') || ''; } catch (e) {}
+      if (!STR[lang]) lang = /^it\b/i.test(navigator.language || '') ? 'it' : 'en';
+
+      var release = null;
+
+      function t(key, vars) {
+        var s = (STR[lang] || STR.en)[key] || STR.en[key] || '';
+        return s.replace(/\{(\w+)\}/g, function (_, k) { return vars && vars[k] != null ? vars[k] : ''; });
+      }
+
+      function render() {
+        document.documentElement.lang = lang;
+        document.querySelectorAll('[data-i18n]').forEach(function (el) {
+          el.textContent = t(el.getAttribute('data-i18n'));
+        });
+        document.getElementById('lang').value = lang;
+        var vl = document.getElementById('version-line');
+        vl.textContent = release ? t('version', { v: release.tag_name }) : t('versionUnknown');
+        setMeta('meta-mac', release && release.mac);
+        setMeta('meta-win', release && release.win);
+      }
+
+      function setMeta(id, asset) {
+        var el = document.getElementById(id);
+        if (!asset) { el.innerHTML = '&nbsp;'; return; }
+        el.textContent = release.tag_name + ' · ' + t('size', { mb: Math.round(asset.size / 1048576) });
+      }
+
+      document.getElementById('lang').addEventListener('change', function (e) {
+        lang = e.target.value;
+        try { localStorage.setItem('lang', lang); } catch (err) {}
+        render();
+      });
+
+      // Put the visitor's platform first.
+      var ua = navigator.userAgent || '';
+      var isMac = /Mac|iPhone|iPad/.test(ua);
+      if (!isMac) {
+        var dls = document.querySelector('.downloads');
+        dls.appendChild(document.getElementById('dl-mac'));
+      }
+      if (isMac) document.getElementById('dl-win').classList.replace('btn-accent', 'btn-ghost');
+      else document.getElementById('dl-mac').classList.replace('btn-accent', 'btn-ghost');
+
+      render();
+
+      // Resolve the direct download links from the latest GitHub release.
+      // If the API is unreachable (rate limit, offline) the buttons keep pointing at the releases page.
+      fetch('https://api.github.com/repos/' + REPO + '/releases/latest', { headers: { Accept: 'application/vnd.github+json' } })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (data) {
+          if (!data || !data.assets) return;
+          var mac = data.assets.find(function (a) { return /\.dmg$/i.test(a.name); });
+          var win = data.assets.find(function (a) { return /\.exe$/i.test(a.name); });
+          release = { tag_name: data.tag_name, mac: mac, win: win };
+          if (mac) document.getElementById('dl-mac').href = mac.browser_download_url;
+          if (win) document.getElementById('dl-win').href = win.browser_download_url;
+          render();
+        })
+        .catch(function () {});
+    })();
+  </script>
+</body>
+</html>

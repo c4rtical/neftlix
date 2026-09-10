@@ -6,7 +6,8 @@
 
 <p align="center">
   A modern, Netflix-style client for the IPTV provider you already have.<br/>
-  Movies, series, live TV and sport — with a UX that doesn't feel like 2009.
+  Movies, series, live TV and sport — with a UX that doesn't feel like 2009.<br/>
+  <a href="https://neftlix.tv">neftlix.tv</a>
 </p>
 
 <p align="center">
