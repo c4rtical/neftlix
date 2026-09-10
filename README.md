@@ -150,6 +150,8 @@ See the [issues](https://github.com/c4rtical/neftlix/issues) for what is being w
 
 Bug reports with a sample of your panel's JSON are the most valuable thing you can send: every Xtream panel is slightly different. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
+Questions, ideas or a panel sample you'd rather not post publicly: [hi@neftlix.tv](mailto:hi@neftlix.tv).
+
 ## Support the project
 
 Neftlix is free and will stay free. If it replaced a paid app for you and you feel like buying me a coffee:
@@ -166,7 +168,7 @@ Or with crypto:
 | SOL | `7sEvuGqEwQmUDbZTdQYnmJJjvHmda6cnCBMya1Em2sSR` |
 | EVM | `0x4e5d74DBC7F46b29F587f573014F8D682446Ff4f` |
 
-Stars, bug reports and panel samples help just as much.
+Stars, bug reports and panel samples help just as much. Say hello at [hi@neftlix.tv](mailto:hi@neftlix.tv).
 
 ## License
 

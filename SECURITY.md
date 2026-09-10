@@ -10,6 +10,6 @@ Neftlix is meant to run on your own machine or home network. It stores your IPTV
 
 ## Reporting a vulnerability
 
-Please do **not** open a public issue for security problems. Use GitHub's private vulnerability reporting on this repository ("Security" tab → "Report a vulnerability"). You will get an acknowledgement within a few days.
+Please do **not** open a public issue for security problems. Use GitHub's private vulnerability reporting on this repository ("Security" tab → "Report a vulnerability"), or email [hi@neftlix.tv](mailto:hi@neftlix.tv). You will get an acknowledgement within a few days.
 
 Include steps to reproduce and the impact you see. Credit is given in the release notes if you want it.

@@ -28,5 +28,6 @@
     "url": "https://github.com/c4rtical/neftlix.git"
   },
   "homepage": "https://neftlix.tv",
+  "author": "c4rtical <hi@neftlix.tv>",
   "license": "MIT"
 }
