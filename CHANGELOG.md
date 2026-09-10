@@ -4,6 +4,8 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-10
+
 ### Added
 - Custom player controls replacing Chromium's native bar: progress with buffer and hover time, ±10 s, volume slider with remembered level and mute, audio/subtitle track menu when the stream exposes them, next episode, channel up/down on live TV, fullscreen; all reachable by keyboard and remote (`data-focus`). Seek and play/pause show a short on-screen feedback.
 - Global player shortcuts: `M` mute, `N` next episode, `F` fullscreen, alongside the existing Space/Enter and arrows.
