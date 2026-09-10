@@ -134,6 +134,10 @@ export async function createApp(opts: AppOptions): Promise<AppHandle> {
     close: async () => {
       clearTimeout(bootTimer);
       clearInterval(periodicTimer);
+      // Drop keep-alive sockets too: otherwise a browser tab can keep sending requests on an
+      // old connection after the database has been closed (seen when the desktop app re-binds
+      // the server for "Apri dalla TV").
+      app.server.closeAllConnections();
       await app.close();
     },
   };
