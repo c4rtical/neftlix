@@ -104,6 +104,7 @@
     .btn-ghost:hover { background: rgba(109,109,110,.55); border-color: rgba(255,255,255,.5); }
     .btn svg { width: 20px; height: 20px; flex: none; }
     .btn small { font-weight: 400; opacity: .8; font-size: 13px; }
+    .btn small[hidden] { display: none; }
 
     main {
       display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -225,14 +226,14 @@
             <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.37 12.6c-.02-2.3 1.88-3.4 1.96-3.45-1.07-1.56-2.73-1.78-3.32-1.8-1.41-.14-2.76.83-3.48.83-.72 0-1.83-.81-3-.79-1.55.02-2.97.9-3.77 2.28-1.61 2.79-.41 6.92 1.16 9.18.77 1.11 1.68 2.35 2.88 2.31 1.16-.05 1.6-.75 3-.75s1.79.75 3.01.72c1.24-.02 2.03-1.13 2.79-2.24.88-1.29 1.24-2.53 1.26-2.6-.03-.01-2.42-.93-2.44-3.69zM14.1 5.86c.64-.77 1.07-1.85.95-2.92-.92.04-2.03.61-2.69 1.38-.59.68-1.11 1.78-.97 2.83 1.03.08 2.07-.52 2.71-1.29z"/></svg>
             <span data-i18n="dlMac">Download for macOS</span>
           </span>
-          <small id="meta-mac">&nbsp;</small>
+          <small id="meta-mac" hidden></small>
         </a>
         <a class="btn btn-accent" id="dl-win" href="https://github.com/c4rtical/neftlix/releases/latest" rel="noopener">
           <span class="row">
             <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 5.5 10.5 4.5v7.1H3zm0 13 7.5 1V12.5H3zm8.5 1.2L21 21V12.5h-9.5zm0-15.4v7.3H21V3z"/></svg>
             <span data-i18n="dlWin">Download for Windows</span>
           </span>
-          <small id="meta-win">&nbsp;</small>
+          <small id="meta-win" hidden></small>
         </a>
       </div>
       <p class="alt">
@@ -247,7 +248,7 @@
       <a href="https://github.com/c4rtical/neftlix/blob/main/LICENSE" rel="noopener">MIT</a>
       <a href="https://github.com/c4rtical/neftlix/blob/main/CHANGELOG.md" rel="noopener" data-i18n="changelog">Changelog</a>
       <a href="https://github.com/c4rtical/neftlix/issues" rel="noopener" data-i18n="issues">Report a problem</a>
-      <a href="https://buymeacoffee.com/neftlix" rel="noopener">☕ Buy me a coffee</a>
+      <a href="https://buymeacoffee.com/neftlix" rel="noopener">Buy me a coffee</a>
       <a href="https://github.com/c4rtical/neftlix#support-the-project" rel="noopener" data-i18n="crypto">Crypto</a>
       <span class="disclaimer" data-i18n="disclaimer">Neftlix is an independent open-source project. It is not affiliated with, endorsed by, or connected to Netflix, Inc., and it provides no content of its own.</span>
     </footer>
@@ -306,8 +307,9 @@
 
       function setMeta(id, asset) {
         var el = document.getElementById(id);
-        if (!asset) { el.innerHTML = '&nbsp;'; return; }
+        if (!asset) { el.hidden = true; el.textContent = ''; return; }
         el.textContent = release.tag_name + ' · ' + t('size', { mb: Math.round(asset.size / 1048576) });
+        el.hidden = false;
       }
 
       document.getElementById('lang').addEventListener('change', function (e) {
