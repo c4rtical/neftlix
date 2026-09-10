@@ -1,11 +1,13 @@
 name: Docker
 
-# Publishes ghcr.io/c4rtical/neftlix: ":latest" and ":X.Y.Z" on every version tag,
-# ":edge" on every push to main. The image is what README and docker-compose.yml pull.
+# Publishes ghcr.io/c4rtical/neftlix. ":edge" on every push to main; ":latest" and ":X.Y.Z"
+# as well when the push is a release (package.json carries a version whose
+# tag vX.Y.Z is missing or points at this commit; release.yml creates that tag). The tag
+# push itself cannot be the trigger: tags created by a workflow with GITHUB_TOKEN do not
+# start other workflows. The image is what README and docker-compose.yml pull.
 on:
   push:
     branches: [main]
-    tags: ['v*']
   workflow_dispatch:
 
 permissions:
@@ -21,6 +23,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - id: ver
+        name: Decide whether this commit is a release
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          TAGGED=$(git ls-remote --tags origin "refs/tags/v$VERSION^{}" | cut -f1)
+          if [ -z "$TAGGED" ] || [ "$TAGGED" = "$GITHUB_SHA" ]; then
+            echo "release=true" >> "$GITHUB_OUTPUT"; echo "release $VERSION"
+          else
+            echo "release=false" >> "$GITHUB_OUTPUT"; echo "not a release (v$VERSION is $TAGGED)"
+          fi
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
@@ -33,10 +46,9 @@ jobs:
         with:
           images: ghcr.io/${{ github.repository }}
           tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
-            type=raw,value=edge,enable=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=edge
+            type=raw,value=latest,enable=${{ steps.ver.outputs.release == 'true' }}
+            type=raw,value=${{ steps.ver.outputs.version }},enable=${{ steps.ver.outputs.release == 'true' }}
       - uses: docker/build-push-action@v6
         with:
           context: .
