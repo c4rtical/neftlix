@@ -2,7 +2,7 @@
   <img src="web/public/logo.svg" width="96" alt="Neftlix logo" />
 </p>
 
-<h1 align="center">Neftlix</h1>
+<h1 align="center"><img src="docs/wordmark.svg" height="44" alt="Neftlix" /></h1>
 
 <p align="center">
   A modern, Netflix-style client for the IPTV provider you already have.<br/>
@@ -18,7 +18,7 @@
   <a href="#support-the-project"><img src="https://img.shields.io/badge/support-crypto-orange.svg" alt="Support the project" /></a>
 </p>
 
-> **Neftlix does not provide any content.** It ships with no channels, playlists, servers or credentials. You connect the Xtream Codes account you already own; what you watch is your provider's responsibility. Neftlix is not affiliated with, endorsed by, or connected to Netflix, Inc.
+> **`Neftlix` does not provide any content.** It ships with no channels, playlists, servers or credentials. You connect the Xtream Codes account you already own; what you watch is your provider's responsibility. `Neftlix` is not affiliated with, endorsed by, or connected to Netflix, Inc.
 
 ---
 
@@ -42,7 +42,7 @@ Grab the latest build from [Releases](https://github.com/c4rtical/neftlix/releas
 | | File | First launch |
 |---|---|---|
 | **Windows** | `Neftlix-Setup-x.y.z.exe` | SmartScreen shows "unknown publisher": click *More info* → *Run anyway*. |
-| **macOS** | `Neftlix-x.y.z-universal.dmg` | Drag Neftlix to Applications. Since the app isn't signed yet, macOS says it is "damaged" or from an "unidentified developer": run `xattr -cr /Applications/Neftlix.app` once in Terminal, or right-click → *Open*. |
+| **macOS** | `Neftlix-x.y.z-universal.dmg` | Drag `Neftlix` to Applications. Since the app isn't signed yet, macOS says it is "damaged" or from an "unidentified developer": run `xattr -cr /Applications/Neftlix.app` once in Terminal, or right-click → *Open*. |
 
 The app runs the same server described below on your machine (127.0.0.1 only) and keeps its data in your user folder. Your credentials and your video never leave your computer.
 
@@ -50,13 +50,13 @@ The app checks GitHub Releases for updates: on Windows it installs them in one c
 
 ### Watch on your TV
 
-Settings → **Apri dalla TV** → *Attiva*. The app shows an address such as `http://192.168.1.20:53412` and a 6-digit PIN: open that address in the TV's browser (LG, Samsung, Fire TV Silk, any tablet or phone on the same Wi-Fi), enter the PIN once, and pick a profile. The computer stays the brain (catalogue, guide, progress) and must stay on while you watch; the video itself goes from your provider straight to the TV. Windows asks once to allow Neftlix through the firewall on private networks. A native Android TV / Fire TV app is next on the roadmap.
+Settings → **Apri dalla TV** → *Attiva*. The app shows an address such as `http://192.168.1.20:53412` and a 6-digit PIN: open that address in the TV's browser (LG, Samsung, Fire TV Silk, any tablet or phone on the same Wi-Fi), enter the PIN once, and pick a profile. The computer stays the brain (catalogue, guide, progress) and must stay on while you watch; the video itself goes from your provider straight to the TV. Windows asks once to allow `Neftlix` through the firewall on private networks. A native Android TV / Fire TV app is next on the roadmap.
 
 Prefer a browser on your TV or phone? Run the server on a PC or NAS instead (see *Quick start* below) and open it from any device on your network.
 
 ## Why
 
-Classic IPTV players are channel lists with a search box. Neftlix treats your provider's catalogue like a streaming service: a personalised home, "continue watching", series with seasons and episodes, favourites, a watchlist, football fixtures mapped to the channel that actually broadcasts them.
+Classic IPTV players are channel lists with a search box. `Neftlix` treats your provider's catalogue like a streaming service: a personalised home, "continue watching", series with seasons and episodes, favourites, a watchlist, football fixtures mapped to the channel that actually broadcasts them.
 
 ## Features
 
@@ -103,7 +103,7 @@ All optional. Set as environment variables.
 | `PORT` | `8787` | HTTP port |
 | `HOST` | `0.0.0.0` | Bind address (`127.0.0.1` to keep it local) |
 | `NEFTLIX_DATA` | `./data` | Where the SQLite database lives |
-| `NEFTLIX_PASSWORD` | – | If set, the whole app asks for this password (HTTP basic auth). Use it when exposing Neftlix beyond your home network. |
+| `NEFTLIX_PASSWORD` | – | If set, the whole app asks for this password (HTTP basic auth). Use it when exposing `Neftlix` beyond your home network. |
 | `FOOTBALL_DATA_KEY` | – | Free [football-data.org](https://www.football-data.org/client/register) key for a richer fixtures calendar. Can also be set from Settings. |
 | `LOG_LEVEL` | `info` | Fastify log level |
 
@@ -159,7 +159,7 @@ Questions, ideas or a panel sample you'd rather not post publicly: [hi@neftlix.t
 
 ## Support the project
 
-Neftlix is free and will stay free. If it replaced a paid app for you and you feel like buying me a coffee:
+`Neftlix` is free and will stay free. If it replaced a paid app for you and you feel like buying me a coffee:
 
 <p align="center">
   <a href="https://buymeacoffee.com/neftlix"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" height="60" /></a>
