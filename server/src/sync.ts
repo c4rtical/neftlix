@@ -1,7 +1,7 @@
 import type { Db } from './db.ts';
 import { now } from './db.ts';
 import { refreshEpg } from './epg.ts';
-import { enrichSeriesFromTmdb } from './tmdb.ts';
+import { enrichSeriesFromTmdb, getTmdbKey, tmdbState } from './tmdb.ts';
 import { XtreamClient, flattenEpisodes, type XtreamVodStream, type XtreamSeries, type XtreamCategory, type XtreamLiveStream } from './xtream.ts';
 
 export type SyncState = {
@@ -238,6 +238,7 @@ export async function runSync(db: Db, client: XtreamClient): Promise<void> {
     db.prepare('UPDATE account SET last_sync = ? WHERE id = 1').run(now());
     syncState.stage = 'done';
     void refreshEpg(db, client);
+    void enrichAllSeries(db, client);
   } catch (e) {
     syncState.error = e instanceof Error ? e.message : String(e);
     syncState.stage = 'error';
@@ -475,6 +476,75 @@ export async function ensureEpisodes(db: Db, client: XtreamClient, seriesId: num
   }
   // Fill what the provider left empty (no-op without a TMDB key; never throws).
   await enrichSeriesFromTmdb(db, seriesId);
+}
+
+// ---------- Bulk episode completion ----------
+
+const BULK_PACE_MS = 800;
+const BULK_MAX_CONSECUTIVE_ERRORS = 10;
+let bulkCancelled = false;
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Fetches the episodes of every series that has none yet (or was modified since) and completes
+ * them from TMDB, so a series is already whole the first time it is opened. One provider call
+ * per series, paced, favourites and followed series first; runs after each sync and when a TMDB
+ * key is set. Without a key this is skipped: fetching thousands of episode lists only to show
+ * them as the provider left them is not worth the load. Never throws; progress in `tmdbState.bulk`.
+ */
+export async function enrichAllSeries(db: Db, client: XtreamClient): Promise<void> {
+  const bulk = tmdbState.bulk;
+  if (bulk.running || !getTmdbKey(db)) return;
+  const pending = () =>
+    (
+      db
+        .prepare(
+          `SELECT id FROM series WHERE episodes_fetched_at IS NULL
+           ORDER BY (id IN (SELECT CAST(item_id AS INTEGER) FROM favorite WHERE item_type = 'series'
+                            UNION SELECT CAST(item_id AS INTEGER) FROM watchlist WHERE item_type = 'series'
+                            UNION SELECT series_id FROM progress WHERE series_id IS NOT NULL)) DESC,
+                    last_modified DESC`,
+        )
+        .all() as { id: number }[]
+    ).map((r) => r.id);
+  let ids = pending();
+  if (ids.length === 0) return;
+
+  bulkCancelled = false;
+  Object.assign(bulk, { running: true, done: 0, total: ids.length, startedAt: now(), finishedAt: null, error: null });
+  const failed = new Set<number>();
+  try {
+    let consecutiveErrors = 0;
+    while (ids.length > 0 && !bulkCancelled) {
+      for (const id of ids) {
+        if (bulkCancelled) break;
+        // A catalogue sync hits the provider hard enough on its own: wait for it.
+        while (syncState.running && !bulkCancelled) await sleep(2000);
+        if (bulkCancelled) break;
+        try {
+          await ensureEpisodes(db, client, id);
+          consecutiveErrors = 0;
+        } catch (e) {
+          failed.add(id);
+          if (++consecutiveErrors >= BULK_MAX_CONSECUTIVE_ERRORS) throw new Error(`provider non risponde (${e instanceof Error ? e.message : String(e)})`);
+        }
+        bulk.done++;
+        await sleep(BULK_PACE_MS);
+      }
+      // A sync in the meantime may have reset more series (modified on the provider).
+      ids = pending().filter((id) => !failed.has(id));
+      bulk.total += ids.length;
+    }
+  } catch (e) {
+    bulk.error = e instanceof Error ? e.message : String(e);
+  } finally {
+    bulk.running = false;
+    bulk.finishedAt = now();
+  }
+}
+
+export function stopEnrichAllSeries() {
+  bulkCancelled = true;
 }
 
 /**

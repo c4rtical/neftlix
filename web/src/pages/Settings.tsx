@@ -403,11 +403,24 @@ export function Settings({ status, onChanged }: { status: Status; onChanged: () 
           <dd>{tmdb?.hasKey ? 'impostata' : 'non impostata'}{tmdb?.lastError ? ` · errore: ${tmdb.lastError}` : ''}</dd>
           <dt>Episodi completati</dt>
           <dd>{tmdb?.enriched ?? 0}{tmdb?.lastRun ? `, ultimo ${fmtDate(tmdb.lastRun)}` : ''}</dd>
+          <dt>Passata sul catalogo</dt>
+          <dd>
+            {tmdb?.bulk?.running
+              ? `In corso: ${tmdb.bulk.done}/${tmdb.bulk.total} serie`
+              : tmdb?.bulk?.error
+                ? `Interrotta: ${tmdb.bulk.error}`
+                : tmdb?.bulk?.finishedAt
+                  ? `Completata ${fmtDate(tmdb.bulk.finishedAt)}`
+                  : tmdb?.hasKey
+                    ? 'In attesa'
+                    : '—'}
+          </dd>
         </dl>
         <p className="muted small">
           Alcuni provider lasciano gli episodi senza titolo, anteprima o trama ("Serie S01 E07"). Con una chiave gratuita di TMDB (registrazione su
           themoviedb.org/settings/api) i campi mancanti vengono completati da TMDB, solo quando la numerazione della serie coincide con la sua. I dati del provider,
-          quando ci sono, non vengono mai sovrascritti.
+          quando ci sono, non vengono mai sovrascritti. Con la chiave impostata, dopo ogni sincronizzazione una passata in background completa tutto il catalogo
+          (una richiesta al provider per serie, con calma: qualche ora la prima volta).
         </p>
         <div className="keyrow">
           <input data-focus type="password" placeholder={tmdb?.hasKey ? 'Chiave impostata: incolla per sostituire, vuoto per rimuovere' : 'Chiave API TMDB (v3)'} value={tmdbKey} onChange={(e) => setTmdbKey(e.target.value)} />

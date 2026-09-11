@@ -6,6 +6,7 @@ import { resolve } from 'node:path';
 import { openDb } from './db.ts';
 import { XtreamClient } from './xtream.ts';
 import { registerApiRoutes } from './routes.ts';
+import { enrichAllSeries, stopEnrichAllSeries } from './sync.ts';
 import { registerProfileRoutes } from './profiles.ts';
 import { registerStreamRoutes } from './stream.ts';
 import { registerLan, type LanOptions } from './lan.ts';
@@ -114,6 +115,8 @@ export async function createApp(opts: AppOptions): Promise<AppHandle> {
     const empty = (db.prepare('SELECT COUNT(*) AS n FROM epg_programme WHERE stop > ?').get(Math.floor(Date.now() / 1000)) as { n: number }).n === 0;
     if (stale || empty) void refreshEpg(db, c);
     void loadFixtures(db, 14).catch(() => {});
+    // Resume the episode completion pass if a previous run was interrupted (no-op when nothing is pending).
+    void enrichAllSeries(db, c);
   };
   const bootTimer = setTimeout(epgTick, 3000);
   const periodicTimer = setInterval(epgTick, EPG_TICK_MS);
@@ -134,6 +137,7 @@ export async function createApp(opts: AppOptions): Promise<AppHandle> {
     close: async () => {
       clearTimeout(bootTimer);
       clearInterval(periodicTimer);
+      stopEnrichAllSeries();
       // Drop keep-alive sockets too: otherwise a browser tab can keep sending requests on an
       // old connection after the database has been closed (seen when the desktop app re-binds
       // the server for "Apri dalla TV").

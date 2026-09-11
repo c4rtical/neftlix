@@ -18,8 +18,14 @@ const API = 'https://api.themoviedb.org/3';
 const IMG = 'https://image.tmdb.org/t/p/w300';
 const SEASON_TTL = 7 * 24 * 3600;
 
-export type TmdbState = { lastError: string | null; enriched: number; lastRun: number | null };
-export const tmdbState: TmdbState = { lastError: null, enriched: 0, lastRun: null };
+export type BulkState = { running: boolean; done: number; total: number; startedAt: number | null; finishedAt: number | null; error: string | null };
+export type TmdbState = { lastError: string | null; enriched: number; lastRun: number | null; bulk: BulkState };
+export const tmdbState: TmdbState = {
+  lastError: null,
+  enriched: 0,
+  lastRun: null,
+  bulk: { running: false, done: 0, total: 0, startedAt: null, finishedAt: null, error: null },
+};
 
 // ---------- Key ----------
 
@@ -187,7 +193,8 @@ async function seasonEpisodes(db: Db, key: string, tmdbId: string, season: numbe
   const s = await tmdbGet<TmdbSeason>(key, `/tv/${tmdbId}/season/${season}`);
   const list = (s.episodes ?? []).map((e) => ({
     episode_number: Number(e.episode_number),
-    name: e.name || null,
+    // An untranslated episode comes back as "Episodio 3": no better than what we have.
+    name: isGenericTitle(e.name) ? null : e.name,
     overview: e.overview || null,
     still_path: e.still_path || null,
     air_date: e.air_date || null,

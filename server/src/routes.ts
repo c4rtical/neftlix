@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { Db } from './db.ts';
 import { now } from './db.ts';
 import { XtreamClient, decodeEpgText } from './xtream.ts';
-import { runSync, syncState, ensureEpisodes, ensureMovieDetail } from './sync.ts';
+import { runSync, syncState, ensureEpisodes, ensureMovieDetail, enrichAllSeries } from './sync.ts';
 import { epgState, nowNextFor } from './epg.ts';
 import { upcomingMatches } from './matches.ts';
 import { getTmdbKey, setTmdbKey, tmdbState, verifyTmdbKey } from './tmdb.ts';
@@ -541,6 +541,8 @@ export function registerApiRoutes(app: FastifyInstance, ctx: Ctx) {
       }
     }
     setTmdbKey(db, key);
+    const client = ctx.getClient();
+    if (client) void enrichAllSeries(db, client);
     return { ok: true, hasKey: Boolean(getTmdbKey(db)) };
   });
 
