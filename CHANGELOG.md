@@ -4,6 +4,12 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Added
+- Episodes without a title, still or plot ("Show S01 E07") are completed from TMDB when a free key is set (Settings, or `TMDB_API_KEY`). A series is touched only when its numbering provably matches TMDB's: per season when every episode number fits the TMDB season, or as one flat absolute list when the count equals TMDB's total; provider titles already present are cross-checked and the series is left alone on disagreement. Provider data is never overwritten. TMDB responses are cached in the database for a week.
+
+### Fixed
+- Episode titles like "Show S01 E7" (space between season and episode) are no longer shown verbatim; they become "Episodio 7".
+
 ## [0.4.0] - 2026-09-10
 
 ### Added

@@ -90,7 +90,8 @@ CREATE TABLE IF NOT EXISTS series (
   tmdb TEXT,
   last_modified INTEGER NOT NULL DEFAULT 0,
   category_id TEXT,
-  episodes_fetched_at INTEGER
+  episodes_fetched_at INTEGER,
+  episodes_enriched_at INTEGER   -- TMDB fill-in done for the current episode list
 );
 CREATE INDEX IF NOT EXISTS series_modified ON series(last_modified DESC);
 CREATE INDEX IF NOT EXISTS series_cat ON series(category_id);
@@ -110,6 +111,15 @@ CREATE TABLE IF NOT EXISTS episode (
   added INTEGER
 );
 CREATE INDEX IF NOT EXISTS episode_series ON episode(series_id, season, num);
+
+-- TMDB responses used to complete episodes (season -1 = the show's season list).
+CREATE TABLE IF NOT EXISTS tmdb_season (
+  tmdb_id TEXT NOT NULL,
+  season INTEGER NOT NULL,
+  fetched_at INTEGER NOT NULL,
+  json TEXT NOT NULL,
+  PRIMARY KEY (tmdb_id, season)
+);
 
 CREATE TABLE IF NOT EXISTS live_channel (
   id INTEGER PRIMARY KEY,
@@ -188,6 +198,7 @@ function migrate(db: DatabaseSync) {
   const columns = (table: string) => (db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]).map((c) => c.name);
   if (!columns('category').includes('hidden')) db.exec('ALTER TABLE category ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0');
   if (!columns('progress').includes('profile_id')) migrateProfiles(db);
+  if (!columns('series').includes('episodes_enriched_at')) db.exec('ALTER TABLE series ADD COLUMN episodes_enriched_at INTEGER');
 }
 
 /** 0.1.0 → profiles: user tables gain profile_id; existing data goes to profile 1 "Principale". */

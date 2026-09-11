@@ -50,6 +50,7 @@ export const api = {
   liveChannel: (id: string | number) => request<LiveChannelDetail>(`/api/live/channels/${id}`),
   liveEpg: (id: string | number) => request<{ items: EpgItem[] }>(`/api/live/epg/${id}`),
   liveMatches: (days = 7, main = false) => request<{ items: Match[]; source?: string | null; error?: string | null }>(`/api/live/matches${qs({ days, main: main ? '1' : undefined })}`),
+  setTmdbKey: (key: string) => request<{ ok: true; hasKey: boolean }>('/api/settings/tmdb-key', { method: 'POST', body: JSON.stringify({ key }) }),
   setFixturesKey: (key: string) => request<{ ok: true; source: string | null; error: string | null; count: number }>('/api/settings/fixtures-key', { method: 'POST', body: JSON.stringify({ key }) }),
   favorites: () => request<{ items: Card[] }>('/api/favorites'),
   watchlist: () => request<{ items: Card[] }>('/api/watchlist'),

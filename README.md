@@ -72,6 +72,7 @@ Or with Compose: `docker compose up -d` (see [`docker-compose.yml`](docker-compo
 | `NEFTLIX_DATA` | `./data` | Where the SQLite database lives |
 | `NEFTLIX_PASSWORD` | – | If set, the whole app asks for this password (HTTP basic auth). Use it when exposing `Neftlix`&nbsp;beyond your home network. |
 | `FOOTBALL_DATA_KEY` | – | Free [football-data.org](https://www.football-data.org/client/register) key for a richer fixtures calendar. Can also be set from Settings. |
+| `TMDB_API_KEY` | – | Free [TMDB](https://www.themoviedb.org/settings/api) key. Fills in episode titles, stills and plots the provider left empty, only when the series numbering provably matches TMDB's. Can also be set from Settings. |
 | `LOG_LEVEL` | `info` | Fastify log level |
 </details>
 

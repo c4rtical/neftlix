@@ -52,6 +52,7 @@ export type Status = {
   sync: SyncState;
   epg?: { running: boolean; lastRun: number | null; programmes: number; error: string | null };
   fixtures?: { source: string | null; lastRun: number | null; count: number; error: string | null; hasKey: boolean };
+  tmdb?: { hasKey: boolean; lastError: string | null; enriched: number; lastRun: number | null };
   counts: { movies: number; series: number };
 };
 

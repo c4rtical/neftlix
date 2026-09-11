@@ -5,6 +5,7 @@ import { XtreamClient, decodeEpgText } from './xtream.ts';
 import { runSync, syncState, ensureEpisodes, ensureMovieDetail } from './sync.ts';
 import { epgState, nowNextFor } from './epg.ts';
 import { upcomingMatches } from './matches.ts';
+import { getTmdbKey, setTmdbKey, tmdbState, verifyTmdbKey } from './tmdb.ts';
 import { MAIN_COMPETITIONS, channelsForFixture, fallbackCategories, fixtureState, getFixturesKey, loadFixtures, setFixturesKey, sportCategoryIds } from './fixtures.ts';
 import { profileRow } from './profiles.ts';
 
@@ -96,6 +97,7 @@ export function registerApiRoutes(app: FastifyInstance, ctx: Ctx) {
       sync: syncState,
       epg: epgState,
       fixtures: { ...fixtureState, hasKey: Boolean(getFixturesKey(db)) },
+      tmdb: { ...tmdbState, hasKey: Boolean(getTmdbKey(db)) },
       counts,
     };
   });
@@ -526,6 +528,20 @@ export function registerApiRoutes(app: FastifyInstance, ctx: Ctx) {
     setFixturesKey(db, b.key?.trim() || null);
     await loadFixtures(db, 14, true);
     return { ok: true, source: fixtureState.source, error: fixtureState.error, count: fixtureState.count };
+  });
+
+  app.post('/api/settings/tmdb-key', async (req, reply) => {
+    const b = (req.body ?? {}) as { key?: string };
+    const key = b.key?.trim() || null;
+    if (key) {
+      try {
+        await verifyTmdbKey(key);
+      } catch (e) {
+        return reply.code(400).send({ error: e instanceof Error ? e.message : String(e) });
+      }
+    }
+    setTmdbKey(db, key);
+    return { ok: true, hasKey: Boolean(getTmdbKey(db)) };
   });
 
   app.get('/api/watchlist', async (req) => ({ items: watchlistCards(db, pid(req)) }));

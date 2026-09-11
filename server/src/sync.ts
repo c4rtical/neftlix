@@ -1,6 +1,7 @@
 import type { Db } from './db.ts';
 import { now } from './db.ts';
 import { refreshEpg } from './epg.ts';
+import { enrichSeriesFromTmdb } from './tmdb.ts';
 import { XtreamClient, flattenEpisodes, type XtreamVodStream, type XtreamSeries, type XtreamCategory, type XtreamLiveStream } from './xtream.ts';
 
 export type SyncState = {
@@ -430,7 +431,11 @@ const EPISODES_TTL = 6 * 3600;
 export async function ensureEpisodes(db: Db, client: XtreamClient, seriesId: number, force = false): Promise<void> {
   const row = db.prepare('SELECT episodes_fetched_at FROM series WHERE id = ?').get(seriesId) as { episodes_fetched_at: number | null } | undefined;
   if (!row) throw new Error('Serie non trovata');
-  if (!force && row.episodes_fetched_at && now() - row.episodes_fetched_at < EPISODES_TTL) return;
+  if (!force && row.episodes_fetched_at && now() - row.episodes_fetched_at < EPISODES_TTL) {
+    // Cached episodes may still be waiting for TMDB (key set after the fetch): cheap no-op otherwise.
+    await enrichSeriesFromTmdb(db, seriesId);
+    return;
+  }
 
   const info = await client.getSeriesInfo(seriesId);
   const episodes = flattenEpisodes(info);
@@ -459,7 +464,7 @@ export async function ensureEpisodes(db: Db, client: XtreamClient, seriesId: num
     }
     const detail = info.info ?? ({} as Record<string, unknown>);
     db.prepare(`
-      UPDATE series SET episodes_fetched_at = ?,
+      UPDATE series SET episodes_fetched_at = ?, episodes_enriched_at = NULL,
         plot = COALESCE(?, plot), "cast" = COALESCE(?, "cast"), backdrop = COALESCE(?, backdrop)
       WHERE id = ?
     `).run(now(), (detail as { plot?: string }).plot || null, (detail as { cast?: string }).cast || null, backdropOf((detail as { backdrop_path?: string[] }).backdrop_path) || null, seriesId);
@@ -468,17 +473,25 @@ export async function ensureEpisodes(db: Db, client: XtreamClient, seriesId: num
     db.exec('ROLLBACK');
     throw e;
   }
+  // Fill what the provider left empty (no-op without a TMDB key; never throws).
+  await enrichSeriesFromTmdb(db, seriesId);
 }
 
-/** Provider titles look like "Show (1997) - S01E01 - Episode name". Keep the last meaningful part. */
-function cleanEpisodeTitle(raw: string | undefined, season: number, num: number): string {
-  if (!raw) return `Episodio ${num}`;
+/**
+ * Provider titles look like "Show (1997) - S01E01 - Episode name". Keep the last meaningful part.
+ * "Show S01 E1" or "Show - S01E01 - Episodio 1" carry no name at all: those become "Episodio N",
+ * which `isGenericTitle` recognises so TMDB can replace it.
+ */
+export function cleanEpisodeTitle(raw: string | undefined, season: number, num: number): string {
+  const generic = `Episodio ${num}`;
+  if (!raw) return generic;
   const parts = raw.split(/\s+-\s+/);
-  const tagIdx = parts.findIndex((p) => /^S\d{1,2}E\d{1,3}$/i.test(p.trim()));
-  if (tagIdx >= 0 && tagIdx < parts.length - 1) return parts.slice(tagIdx + 1).join(' - ').trim();
-  const m = raw.match(/S\d{1,2}E\d{1,3}\s*[-:–]?\s*(.+)$/i);
+  const tagIdx = parts.findIndex((p) => /^S\d{1,2}\s?E\d{1,3}$/i.test(p.trim()));
+  if (tagIdx >= 0 && tagIdx < parts.length - 1) return parts.slice(tagIdx + 1).join(' - ').trim() || generic;
+  if (/S\d{1,2}\s?E\d{1,3}\s*$/i.test(raw)) return generic;
+  const m = raw.match(/S\d{1,2}\s?E\d{1,3}\s*[-:–]?\s*(.+)$/i);
   if (m && m[1].trim()) return m[1].trim();
-  return raw.trim() || `Episodio ${num}`;
+  return raw.trim() || generic;
 }
 
 const DETAIL_TTL = 7 * 24 * 3600;

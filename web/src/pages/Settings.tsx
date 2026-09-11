@@ -245,6 +245,9 @@ export function Settings({ status, onChanged }: { status: Status; onChanged: () 
   const [busy, setBusy] = useState(false);
   const [fdKey, setFdKey] = useState('');
   const [fdMsg, setFdMsg] = useState<string | null>(null);
+  const [tmdbKey, setTmdbKey] = useState('');
+  const [tmdbMsg, setTmdbMsg] = useState<string | null>(null);
+  const tmdb = status.tmdb;
   const a = status.account;
   const s = status.sync;
   const fx = status.fixtures;
@@ -257,6 +260,21 @@ export function Settings({ status, onChanged }: { status: Status; onChanged: () 
       setFdMsg(r.error ? `Errore: ${r.error}` : `Ok: ${r.count} partite da ${r.source}`);
       setFdKey('');
       onChanged();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const saveTmdbKey = async () => {
+    setBusy(true);
+    setTmdbMsg(null);
+    try {
+      const r = await api.setTmdbKey(tmdbKey);
+      setTmdbMsg(r.hasKey ? 'Chiave salvata: gli episodi vengono completati alla prossima apertura di ogni serie.' : 'Chiave rimossa.');
+      setTmdbKey('');
+      onChanged();
+    } catch (e) {
+      setTmdbMsg(`Errore: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setBusy(false);
     }
@@ -377,6 +395,27 @@ export function Settings({ status, onChanged }: { status: Status; onChanged: () 
           </button>
         </div>
         {fdMsg && <p className="muted small">{fdMsg}</p>}
+      </section>
+      <section className="panel">
+        <h3>Episodi: titoli e anteprime</h3>
+        <dl>
+          <dt>Chiave TMDB</dt>
+          <dd>{tmdb?.hasKey ? 'impostata' : 'non impostata'}{tmdb?.lastError ? ` · errore: ${tmdb.lastError}` : ''}</dd>
+          <dt>Episodi completati</dt>
+          <dd>{tmdb?.enriched ?? 0}{tmdb?.lastRun ? `, ultimo ${fmtDate(tmdb.lastRun)}` : ''}</dd>
+        </dl>
+        <p className="muted small">
+          Alcuni provider lasciano gli episodi senza titolo, anteprima o trama ("Serie S01 E07"). Con una chiave gratuita di TMDB (registrazione su
+          themoviedb.org/settings/api) i campi mancanti vengono completati da TMDB, solo quando la numerazione della serie coincide con la sua. I dati del provider,
+          quando ci sono, non vengono mai sovrascritti.
+        </p>
+        <div className="keyrow">
+          <input data-focus type="password" placeholder={tmdb?.hasKey ? 'Chiave impostata: incolla per sostituire, vuoto per rimuovere' : 'Chiave API TMDB (v3)'} value={tmdbKey} onChange={(e) => setTmdbKey(e.target.value)} />
+          <button className="btn" data-focus onClick={saveTmdbKey} disabled={busy}>
+            Salva
+          </button>
+        </div>
+        {tmdbMsg && <p className="muted small">{tmdbMsg}</p>}
       </section>
       <section className="panel">
         <h3>Comandi da tastiera / telecomando</h3>
