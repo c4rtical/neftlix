@@ -11,6 +11,8 @@ export type Card = {
   progress?: Progress;
   subtitle?: string | null;
   episodeId?: number | null;
+  /** Search results only. */
+  discreet?: boolean;
 };
 
 export type HomeRow = { key: string; title: string; items: Card[]; link?: string };

@@ -7,6 +7,10 @@ All notable changes to this project are documented here. The format follows [Kee
 ### Added
 - Episodes without a title, still or plot ("Show S01 E07") are completed from TMDB when a free key is set (Settings, or `TMDB_API_KEY`). A series is touched only when its numbering provably matches TMDB's: per season when every episode number fits the TMDB season, or as one flat absolute list when the count equals TMDB's total; provider titles already present are cross-checked and the series is left alone on disagreement. Provider data is never overwritten. TMDB responses are cached in the database for a week.
 - With a TMDB key set, a paced background pass fetches and completes the episodes of every series after each sync (favourites, watchlist and started series first), so a series is already whole when first opened. Progress in Settings; it resumes on restart and waits while a sync runs.
+- Discreet categories: a small built-in list of category names is treated as discreet. These categories are now browsable like any other in Film, Serie and Live TV (they used to be left out of every listing, and the provider rows flagged the same way were skipped at import), but their titles leave no trace: playback position is not recorded, so they never appear in "Continua a guardare" nor offer "Riprendi", and a search that only finds such titles is not kept in "Ricerche recenti". Resume points saved before this rule are removed at startup and after each sync. The explicit "Segna come visto" still works.
+
+### Changed
+- Database: `category.hidden` is renamed to `category.discreet` (automatic migration).
 
 ### Fixed
 - Episode titles like "Show S01 E7" (space between season and episode) are no longer shown verbatim; they become "Episodio 7".

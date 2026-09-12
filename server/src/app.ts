@@ -6,7 +6,7 @@ import { resolve } from 'node:path';
 import { openDb } from './db.ts';
 import { XtreamClient } from './xtream.ts';
 import { registerApiRoutes } from './routes.ts';
-import { enrichAllSeries, stopEnrichAllSeries } from './sync.ts';
+import { enrichAllSeries, purgeDiscreetProgress, stopEnrichAllSeries } from './sync.ts';
 import { registerProfileRoutes } from './profiles.ts';
 import { registerStreamRoutes } from './stream.ts';
 import { registerLan, type LanOptions } from './lan.ts';
@@ -38,6 +38,7 @@ const EPG_TICK_MS = 30 * 60 * 1000;
 
 export async function createApp(opts: AppOptions): Promise<AppHandle> {
   const db = openDb(resolve(opts.dataDir, 'neftlix.sqlite'));
+  purgeDiscreetProgress(db);
 
   let client: XtreamClient | null = null;
   const account = db.prepare('SELECT host, username, password FROM account WHERE id = 1').get() as

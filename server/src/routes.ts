@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { Db } from './db.ts';
 import { now } from './db.ts';
 import { XtreamClient, decodeEpgText } from './xtream.ts';
-import { runSync, syncState, ensureEpisodes, ensureMovieDetail, enrichAllSeries } from './sync.ts';
+import { runSync, syncState, ensureEpisodes, ensureMovieDetail, enrichAllSeries, isDiscreetItem, isDiscreetSeries } from './sync.ts';
 import { epgState, nowNextFor } from './epg.ts';
 import { upcomingMatches } from './matches.ts';
 import { getTmdbKey, setTmdbKey, tmdbState, verifyTmdbKey } from './tmdb.ts';
@@ -26,6 +26,8 @@ export type Card = {
   progress?: { position: number; duration: number } | null;
   subtitle?: string | null;
   episodeId?: number | null;
+  /** Search results only: the client keeps a term out of its history when every hit is discreet. */
+  discreet?: boolean;
 };
 
 const MOVIE_CARD_SQL = `m.key AS id, m.title, m.year, m.poster, m.rating, m.backdrop,
@@ -149,12 +151,12 @@ export function registerApiRoutes(app: FastifyInstance, ctx: Ctx) {
     if (kind === 'movie') {
       return db
         .prepare(`SELECT c.id, c.name, (SELECT COUNT(*) FROM movie_category mc WHERE mc.category_id = c.id) AS count
-                  FROM category c WHERE c.kind = 'movie' AND c.hidden = 0 ORDER BY c.position`)
+                  FROM category c WHERE c.kind = 'movie' ORDER BY c.position`)
         .all();
     }
     return db
       .prepare(`SELECT c.id, c.name, (SELECT COUNT(*) FROM series s WHERE s.category_id = c.id) AS count
-                FROM category c WHERE c.kind = 'series' AND c.hidden = 0 ORDER BY c.position`)
+                FROM category c WHERE c.kind = 'series' ORDER BY c.position`)
       .all();
   });
 
@@ -167,8 +169,6 @@ export function registerApiRoutes(app: FastifyInstance, ctx: Ctx) {
     if (q.category) {
       where.push('m.key IN (SELECT movie_key FROM movie_category WHERE category_id = ?)');
       params.push(q.category);
-    } else {
-      where.push(`m.key IN (SELECT mc.movie_key FROM movie_category mc JOIN category c ON c.id = mc.category_id AND c.kind = 'movie' WHERE c.hidden = 0)`);
     }
     if (q.q && q.q.trim()) {
       where.push('m.title LIKE ?');
@@ -282,7 +282,10 @@ export function registerApiRoutes(app: FastifyInstance, ctx: Ctx) {
       .prepare(`SELECT ${SERIES_CARD_SQL} FROM series s WHERE s.title LIKE ?
                 ORDER BY (s.title LIKE ? COLLATE NOCASE) DESC, s.rating DESC NULLS LAST, s.last_modified DESC LIMIT 40`)
       .all(pat, `${q}%`) as SeriesRow[];
-    return { movies: movies.map(movieCard), series: series.map(seriesCard) };
+    return {
+      movies: movies.map((r) => ({ ...movieCard(r), discreet: isDiscreetItem(db, 'movie', r.id) })),
+      series: series.map((r) => ({ ...seriesCard(r), discreet: isDiscreetSeries(db, Number(r.id)) })),
+    };
   });
 
   app.get('/api/home', async (req) => {
@@ -321,7 +324,7 @@ export function registerApiRoutes(app: FastifyInstance, ctx: Ctx) {
 
     // Three genre rows, rotating daily so the home page changes.
     const preferred = ['Azione', 'Commedia', 'Thriller', 'Animazione', 'Dramma', 'Fantascienza', 'Horror', 'Crime', 'Avventura', 'Fantasy', 'Famiglia', 'Documentario'];
-    const cats = db.prepare(`SELECT id, name FROM category WHERE kind = 'movie' AND hidden = 0 ORDER BY position`).all() as { id: string; name: string }[];
+    const cats = db.prepare(`SELECT id, name FROM category WHERE kind = 'movie' ORDER BY position`).all() as { id: string; name: string }[];
     const available = preferred.map((p) => cats.find((c) => c.name.toLowerCase() === p.toLowerCase())).filter(Boolean) as { id: string; name: string }[];
     const dayIndex = Math.floor(Date.now() / 86_400_000);
     const picked = available.length ? [0, 1, 2].map((i) => available[(dayIndex * 3 + i) % available.length]) : [];
@@ -348,6 +351,8 @@ export function registerApiRoutes(app: FastifyInstance, ctx: Ctx) {
       if (!e) return reply.code(404).send({ error: 'Episodio non trovato' });
       seriesId = e.series_id;
     }
+    // Discreet categories leave no trace: no resume point, no "Continua a guardare" entry.
+    if (isDiscreetItem(db, b.type, id)) return { ok: true, watched: false, tracked: false };
     const prev = db.prepare('SELECT watched FROM progress WHERE profile_id = ? AND item_type = ? AND item_id = ?').get(pid(req), b.type, id) as { watched: number } | undefined;
     const watched = prev?.watched === 1 || (duration > 0 && (position / duration >= WATCHED_RATIO || duration - position < 60)) ? 1 : 0;
     db.prepare(`
@@ -395,7 +400,7 @@ export function registerApiRoutes(app: FastifyInstance, ctx: Ctx) {
     const all = (req.query as { all?: string }).all === '1';
     const rows = db
       .prepare(`SELECT c.id, c.name, (SELECT COUNT(*) FROM live_channel l WHERE l.category_id = c.id) AS count
-                FROM category c WHERE c.kind = 'live' AND c.hidden = 0 ORDER BY c.position`)
+                FROM category c WHERE c.kind = 'live' ORDER BY c.position`)
       .all() as { id: string; name: string; count: number }[];
     const nonEmpty = rows.filter((r) => r.count > 0);
     return all ? nonEmpty : nonEmpty.filter((r) => SPORT_RE.test(r.name));
@@ -408,12 +413,11 @@ export function registerApiRoutes(app: FastifyInstance, ctx: Ctx) {
     const offset = Number(q.offset) || 0;
     const where: string[] = [];
     const params: unknown[] = [];
-    where.push(`l.category_id NOT IN (SELECT id FROM category WHERE kind = 'live' AND hidden = 1)`);
     if (q.category) {
       where.push('l.category_id = ?');
       params.push(q.category);
     } else if (q.sport === '1') {
-      const sportCats = (db.prepare(`SELECT id, name FROM category WHERE kind = 'live' AND hidden = 0`).all() as { id: string; name: string }[])
+      const sportCats = (db.prepare(`SELECT id, name FROM category WHERE kind = 'live'`).all() as { id: string; name: string }[])
         .filter((c) => SPORT_RE.test(c.name))
         .map((c) => c.id);
       where.push(`l.category_id IN (SELECT value FROM json_each(?))`);

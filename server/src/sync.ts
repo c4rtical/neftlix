@@ -24,8 +24,45 @@ export const syncState: SyncState = {
   error: null,
 };
 
-/** Adult categories are hidden from every listing. */
-export const ADULT_CATEGORY_RE = /\bxxx\b|adult|porn|erotic|\b18\+|hot\b|for adults/i;
+/** Discreet categories: browsable like any other, but their items leave no trace (see `isDiscreetItem`). */
+export const DISCREET_CATEGORY_RE = /\bxxx\b|adult|porn|erotic|\b18\+|hot\b|for adults/i;
+
+/**
+ * True when a movie or episode belongs only to discreet categories. Playback progress is
+ * never recorded for these, so they never show up in "Continua a guardare" or offer "Riprendi".
+ * A movie that also sits in a normal category is treated as normal.
+ */
+export function isDiscreetItem(db: Db, type: 'movie' | 'episode', id: string): boolean {
+  const sql =
+    type === 'movie'
+      ? `SELECT 1 FROM movie_category mc JOIN category c ON c.id = mc.category_id AND c.kind = 'movie'
+         WHERE mc.movie_key = ? AND c.discreet = 1
+           AND NOT EXISTS (SELECT 1 FROM movie_category mc2 JOIN category c2 ON c2.id = mc2.category_id AND c2.kind = 'movie'
+                           WHERE mc2.movie_key = mc.movie_key AND c2.discreet = 0)`
+      : `SELECT 1 FROM episode e JOIN series s ON s.id = e.series_id
+         JOIN category c ON c.id = s.category_id AND c.kind = 'series' WHERE e.id = ? AND c.discreet = 1`;
+  return Boolean(db.prepare(sql).get(type === 'movie' ? id : Number(id)));
+}
+
+/** True when the series sits in a discreet category. */
+export function isDiscreetSeries(db: Db, id: number): boolean {
+  return Boolean(db.prepare(`SELECT 1 FROM series s JOIN category c ON c.id = s.category_id AND c.kind = 'series' WHERE s.id = ? AND c.discreet = 1`).get(id));
+}
+
+/** Drops the resume points recorded for discreet items before this rule existed (or before a category got flagged). */
+export function purgeDiscreetProgress(db: Db): number {
+  const movies = db.prepare(`
+    DELETE FROM progress WHERE item_type = 'movie' AND watched = 0 AND item_id IN (
+      SELECT mc.movie_key FROM movie_category mc JOIN category c ON c.id = mc.category_id AND c.kind = 'movie' WHERE c.discreet = 1
+    ) AND item_id NOT IN (
+      SELECT mc.movie_key FROM movie_category mc JOIN category c ON c.id = mc.category_id AND c.kind = 'movie' WHERE c.discreet = 0
+    )`).run();
+  const episodes = db.prepare(`
+    DELETE FROM progress WHERE item_type = 'episode' AND watched = 0 AND series_id IN (
+      SELECT s.id FROM series s JOIN category c ON c.id = s.category_id AND c.kind = 'series' WHERE c.discreet = 1
+    )`).run();
+  return Number(movies.changes) + Number(episodes.changes);
+}
 
 const QUALITY_TAGS = /\b(4K|UHD|2160p|1080p|720p|HDR|HEVC|H\.?265|x265|REMUX|BLURAY|WEB-?DL|HDTS|CAM|ITA|ENG|SUB-?ITA)\b/gi;
 
@@ -117,7 +154,6 @@ function groupMovies(rows: XtreamVodStream[], known: Map<string, string> = new M
   const groups = new Map<string, MovieGroup>();
   for (const row of rows) {
     if (!row || !row.name || !row.stream_id) continue;
-    if (String(row.is_adult) === '1') continue;
     const parsed = parseTitle(row.name);
     let tmdb = cleanTmdb(row.tmdb ?? row.tmdb_id);
     if (!tmdb) {
@@ -204,11 +240,11 @@ export async function runSync(db: Db, client: XtreamClient): Promise<void> {
     db.exec('BEGIN');
     try {
       db.prepare('DELETE FROM category').run();
-      const ins = db.prepare('INSERT OR REPLACE INTO category (id, kind, name, position, hidden) VALUES (?, ?, ?, ?, ?)');
-      const hidden = (name: string) => (ADULT_CATEGORY_RE.test(name) ? 1 : 0);
-      vodCats.forEach((c, i) => ins.run(String(c.category_id), 'movie', c.category_name, i, hidden(c.category_name)));
-      seriesCats.forEach((c, i) => ins.run(String(c.category_id), 'series', c.category_name, i, hidden(c.category_name)));
-      liveCats.forEach((c, i) => ins.run(String(c.category_id), 'live', c.category_name, i, hidden(c.category_name)));
+      const ins = db.prepare('INSERT OR REPLACE INTO category (id, kind, name, position, discreet) VALUES (?, ?, ?, ?, ?)');
+      const discreet = (name: string) => (DISCREET_CATEGORY_RE.test(name) ? 1 : 0);
+      vodCats.forEach((c, i) => ins.run(String(c.category_id), 'movie', c.category_name, i, discreet(c.category_name)));
+      seriesCats.forEach((c, i) => ins.run(String(c.category_id), 'series', c.category_name, i, discreet(c.category_name)));
+      liveCats.forEach((c, i) => ins.run(String(c.category_id), 'live', c.category_name, i, discreet(c.category_name)));
       db.exec('COMMIT');
     } catch (e) {
       db.exec('ROLLBACK');
@@ -234,6 +270,7 @@ export async function runSync(db: Db, client: XtreamClient): Promise<void> {
     const series = await client.getSeries();
     syncState.stage = 'serie (import)';
     importSeries(db, series);
+    purgeDiscreetProgress(db);
 
     db.prepare('UPDATE account SET last_sync = ? WHERE id = 1').run(now());
     syncState.stage = 'done';
@@ -403,7 +440,6 @@ function importLive(db: Db, rows: XtreamLiveStream[]) {
     let i = 0;
     for (const r of rows) {
       if (!r || !r.stream_id || !r.name) continue;
-      if (String(r.is_adult) === '1') continue;
       if (isSeparatorChannel(r.name)) continue;
       seen.run(r.stream_id);
       upsert.run(

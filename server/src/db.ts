@@ -196,7 +196,12 @@ export function openDb(path: string): Db {
 /** Additive migrations for databases created by older versions. */
 function migrate(db: DatabaseSync) {
   const columns = (table: string) => (db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]).map((c) => c.name);
-  if (!columns('category').includes('hidden')) db.exec('ALTER TABLE category ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0');
+  // `discreet` (formerly `hidden`): these categories used to be hidden from every listing; they are now browsable
+  // but leave no trace (no resume point, no "Continua a guardare", no search history).
+  if (!columns('category').includes('discreet')) {
+    if (columns('category').includes('hidden')) db.exec('ALTER TABLE category RENAME COLUMN hidden TO discreet');
+    else db.exec('ALTER TABLE category ADD COLUMN discreet INTEGER NOT NULL DEFAULT 0');
+  }
   if (!columns('progress').includes('profile_id')) migrateProfiles(db);
   if (!columns('series').includes('episodes_enriched_at')) db.exec('ALTER TABLE series ADD COLUMN episodes_enriched_at INTEGER');
 }

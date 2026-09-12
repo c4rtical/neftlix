@@ -58,7 +58,8 @@ export function Search({ profileId }: { profileId: number }) {
       .then((r) => {
         if (!alive) return;
         setResult(r);
-        if (r.movies.length + r.series.length > 0) remember(q.trim());
+        // Discreet titles are searchable but leave no trace: a term that only finds those is not kept in the history.
+        if ([...r.movies, ...r.series].some((c) => !c.discreet)) remember(q.trim());
       })
       .finally(() => alive && setBusy(false));
     return () => {
