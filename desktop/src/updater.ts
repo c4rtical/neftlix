@@ -3,7 +3,7 @@ import { rename, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { PassThrough, Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
-import { compareSemver, parseTag, pickAsset, type PickedAsset, type ReleaseAsset } from './versions.js';
+import { compareSemver, parseTag, pickAsset, type PickedAsset, type ReleaseAsset } from './versions.ts';
 
 export type UpdateStatus = 'idle' | 'checking' | 'up-to-date' | 'available' | 'downloading' | 'downloaded' | 'error';
 export type UpdateState = {
@@ -45,6 +45,7 @@ type GithubRelease = {
 
 type Pending = { resolve: () => void; reject: (e: Error) => void };
 
+const REPO = 'https://github.com/c4rtical/neftlix';
 const RELEASES_API = 'https://api.github.com/repos/c4rtical/neftlix/releases/latest';
 const CHECK_EVERY_MS = 6 * 3600 * 1000;
 const FIRST_CHECK_MS = 10_000;
@@ -94,9 +95,12 @@ export function createUpdater(deps: UpdaterDeps): Updater {
   if (deps.autoUpdater) {
     const au = deps.autoUpdater;
     // A check that already timed out fell back to the GitHub API: ignore its late events.
-    au.on('update-available', ((info: { version: string }) => {
+    // The installer name and the release page travel with the state: the Settings panel offers the
+    // download only when it knows the file, and the "Note di rilascio" link needs the page.
+    au.on('update-available', ((info: { version: string; path?: string; files?: { url?: string }[] }) => {
       if (!pendingCheck) return;
-      setState({ status: 'available', latest: info.version, checkedAt: Date.now() });
+      const assetName = info.path || info.files?.[0]?.url || `Neftlix-Setup-${info.version}.exe`;
+      setState({ status: 'available', latest: info.version, assetName, releaseUrl: `${REPO}/releases/tag/v${info.version}`, checkedAt: Date.now() });
       pendingCheck.resolve();
       pendingCheck = null;
     }) as never);

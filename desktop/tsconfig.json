@@ -10,7 +10,8 @@
     "rootDir": "src",
     "skipLibCheck": true,
     "noUnusedLocals": true,
-    "verbatimModuleSyntax": true
+    "verbatimModuleSyntax": true,
+    "rewriteRelativeImportExtensions": true
   },
   "include": ["src"],
   "exclude": ["src/preload.cts"]

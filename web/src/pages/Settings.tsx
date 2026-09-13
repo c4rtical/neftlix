@@ -201,7 +201,7 @@ function DesktopUpdatePanel() {
           Controlla aggiornamenti
         </button>
         {state?.status === 'available' &&
-          (state.assetName ? (
+          (state.assetName || !state.manual ? (
             <button className="btn btn-primary" data-focus onClick={() => desktop.download()}>
               Scarica {state.latest}
             </button>

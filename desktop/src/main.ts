@@ -1,10 +1,10 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, shell, type MenuItemConstructorOptions } from 'electron';
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { lanAddresses, loadLanState, PIN_RE, saveLanState, type LanState } from './lan.js';
-import { startServer, type RunningServer } from './server.js';
-import { createUpdater, type Updater, type UpdaterDeps } from './updater.js';
-import { loadWindowState, trackWindowState } from './window-state.js';
+import { lanAddresses, loadLanState, PIN_RE, saveLanState, type LanState } from './lan.ts';
+import { startServer, type RunningServer } from './server.ts';
+import { createUpdater, type Updater, type UpdaterDeps } from './updater.ts';
+import { loadWindowState, trackWindowState } from './window-state.ts';
 
 const REPO = 'https://github.com/c4rtical/neftlix';
 const DEBUG = process.env.NEFTLIX_DEBUG === '1';
