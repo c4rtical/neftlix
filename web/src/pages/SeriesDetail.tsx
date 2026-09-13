@@ -96,6 +96,14 @@ export function SeriesDetail() {
   const current = s.seasons.find((x) => x.season === season) ?? s.seasons[0];
   const totalEps = s.seasons.reduce((n, x) => n + x.episodes.length, 0);
 
+  // Easter egg: on Rick and Morty a portal floats beside the episodes and drops you into a random one.
+  const portal = /\brick\s*(and|&|e)\s*morty\b/i.test(s.title) && totalEps > 0;
+  const openPortal = () => {
+    const all = s.seasons.flatMap((se) => se.episodes);
+    const ep = all[Math.floor(Math.random() * all.length)];
+    if (ep) nav(`/play/episode/${ep.id}`);
+  };
+
   return (
     <div className="page detail" style={bg ? { backgroundImage: `url(${bg})` } : undefined}>
       <div className="detail-shade" />
@@ -149,6 +157,11 @@ export function SeriesDetail() {
               <EpisodeRow key={ep.id} ep={ep} onWatched={setWatched} />
             ))}
           </div>
+          {portal && (
+            <button className="portal" data-focus onClick={openPortal} title="Wubba lubba dub dub" aria-label="Apri un episodio a caso">
+              <img src="/portal.png" alt="" />
+            </button>
+          )}
         </div>
       )}
     </div>

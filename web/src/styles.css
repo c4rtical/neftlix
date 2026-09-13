@@ -609,6 +609,56 @@ input {
   gap: 10px;
   max-width: 980px;
 }
+/* Rick and Morty easter egg: a portal floating in the empty space right of the episodes. */
+.portal {
+  position: absolute;
+  top: 110px;
+  right: clamp(24px, 10vw, 200px);
+  width: 170px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  filter: drop-shadow(0 0 18px rgba(120, 255, 60, 0.45));
+  animation: portal-float 4s ease-in-out infinite, portal-glow 2.4s ease-in-out infinite;
+  transition: transform 0.3s, filter 0.3s;
+}
+.portal img {
+  display: block;
+  width: 100%;
+}
+.portal:hover,
+.portal:focus-visible {
+  outline: none;
+  transform: scale(1.12);
+  filter: drop-shadow(0 0 34px rgba(120, 255, 60, 0.85));
+}
+.portal:active {
+  transform: scale(0.94);
+}
+@keyframes portal-glow {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 14px rgba(120, 255, 60, 0.35));
+  }
+  50% {
+    filter: drop-shadow(0 0 28px rgba(120, 255, 60, 0.7));
+  }
+}
+@keyframes portal-float {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  50% {
+    translate: 0 -12px;
+  }
+}
+@media (max-width: 1300px) {
+  .portal {
+    display: none;
+  }
+}
 .episode {
   display: flex;
   gap: 16px;
