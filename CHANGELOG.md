@@ -4,6 +4,12 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-09-13
+
+### Fixed
+- Windows: the in-app update never offered the download. electron-updater found the new version, but the state it produced lacked the installer name, and the Settings panel shows "Scarica" only when it knows the file; the check button looked like it did nothing. The installer name and the release page now travel with the state, and the panel offers the download whenever electron-updater drives the update. Anyone on 0.4.0 or 0.5.0 installs this version by hand once; from here on the button works.
+- Desktop: updater covered by tests (a stand-in electron-updater fires the events); sources import `.ts` files, rewritten to `.js` at build time, so tests load them directly.
+
 ## [0.5.0] - 2026-09-13
 
 ### Added
