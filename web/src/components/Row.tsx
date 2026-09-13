@@ -60,12 +60,12 @@ export function Row({ title, items, link, wide = false }: { title: string; items
           ))}
         </div>
         {canLeft && (
-          <button type="button" className="row-arrow row-arrow-left" tabIndex={-1} aria-label="Indietro" onClick={() => page(-1)}>
+          <button type="button" className="row-arrow row-arrow-left" tabIndex={-1} aria-label="Indietro" onMouseDown={(e) => e.preventDefault()} onClick={() => page(-1)}>
             <IconChevronLeft />
           </button>
         )}
         {canRight && (
-          <button type="button" className="row-arrow row-arrow-right" tabIndex={-1} aria-label="Avanti" onClick={() => page(1)}>
+          <button type="button" className="row-arrow row-arrow-right" tabIndex={-1} aria-label="Avanti" onMouseDown={(e) => e.preventDefault()} onClick={() => page(1)}>
             <IconChevronRight />
           </button>
         )}

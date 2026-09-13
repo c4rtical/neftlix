@@ -371,7 +371,7 @@ input {
   top: 8px;
   bottom: 14px;
   width: 44px;
-  display: flex;
+  display: none; /* mouse only: on touch screens an invisible arrow would swallow taps at the row's edges */
   align-items: center;
   justify-content: center;
   border: 0;
@@ -400,6 +400,9 @@ input {
   background: rgba(0, 0, 0, 0.8);
 }
 @media (hover: hover) and (pointer: fine) {
+  .row-arrow {
+    display: flex;
+  }
   .row-body:hover .row-arrow {
     opacity: 1;
   }
