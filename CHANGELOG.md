@@ -4,6 +4,11 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.5.3] - 2026-09-13
+
+### Added
+- Preferiti and Da guardare are split into "Film" and "Serie TV", each under its own heading with a count; a kind with no titles is not shown. Click the heading to fold the group away and back; what is folded is remembered per list, so a long list of films no longer has to be scrolled past to reach the series.
+
 ## [0.5.2] - 2026-09-13
 
 ### Added
