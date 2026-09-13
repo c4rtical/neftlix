@@ -363,6 +363,47 @@ input {
 .row-scroll::-webkit-scrollbar {
   display: none;
 }
+.row-body {
+  position: relative;
+}
+.row-arrow {
+  position: absolute;
+  top: 8px;
+  bottom: 14px;
+  width: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  padding: 0;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.55);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease, background 0.15s ease;
+  z-index: 2;
+}
+.row-arrow svg {
+  width: 30px;
+  height: 30px;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6));
+}
+.row-arrow-left {
+  left: -6px;
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+.row-arrow-right {
+  right: -6px;
+  border-radius: var(--radius) 0 0 var(--radius);
+}
+.row-arrow:hover {
+  background: rgba(0, 0, 0, 0.8);
+}
+@media (hover: hover) and (pointer: fine) {
+  .row-body:hover .row-arrow {
+    opacity: 1;
+  }
+}
 
 /* Cards */
 .card {

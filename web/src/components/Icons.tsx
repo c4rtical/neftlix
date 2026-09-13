@@ -166,3 +166,15 @@ export const IconDice = (p: SVGProps<SVGSVGElement>) => (
     <path d="M8 8h.01M16 8h.01M12 12h.01M8 16h.01M16 16h.01" />
   </svg>
 );
+
+export const IconChevronLeft = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}>
+    <path d="m15 5-7 7 7 7" />
+  </svg>
+);
+
+export const IconChevronRight = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}>
+    <path d="m9 5 7 7-7 7" />
+  </svg>
+);
