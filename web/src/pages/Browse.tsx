@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api';
 import type { Card, Category } from '../types';
 import { Grid } from '../components/Row';
 import { BrowseHeader, CategorySidebar } from '../components/BrowseHeader';
+import { cardHref } from '../components/Card';
+import { IconDice } from '../components/Icons';
 
 const PAGE = 60;
 
@@ -15,6 +17,7 @@ const SORTS: { id: string; label: string }[] = [
 ];
 
 export function Browse({ kind }: { kind: 'movie' | 'series' }) {
+  const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const category = params.get('category') ?? '';
   const sort = params.get('sort') ?? 'added';
@@ -26,6 +29,7 @@ export function Browse({ kind }: { kind: 'movie' | 'series' }) {
   const [loading, setLoading] = useState(false);
   const sentinel = useRef<HTMLDivElement>(null);
   const [catFilter, setCatFilter] = useState('');
+  const [rolling, setRolling] = useState(false);
 
   useEffect(() => {
     api.categories(kind).then((c) => setCats(c.filter((x) => x.count > 0)));
@@ -81,6 +85,18 @@ export function Browse({ kind }: { kind: 'movie' | 'series' }) {
     setParams(next, { replace: true });
   };
 
+  // "Random": one title drawn from the current category (or from everything, discreet categories aside).
+  const roll = async () => {
+    if (rolling) return;
+    setRolling(true);
+    try {
+      const c = await api.random(kind, category || undefined);
+      navigate(cardHref(c));
+    } catch {
+      setRolling(false);
+    }
+  };
+
   const visibleCats = catFilter ? cats.filter((c) => c.name.toLowerCase().includes(catFilter.toLowerCase())) : cats;
   const current = cats.find((c) => c.id === category);
 
@@ -107,6 +123,11 @@ export function Browse({ kind }: { kind: 'movie' | 'series' }) {
           onSort={(id) => setParam('sort', id)}
           count={total}
           countLabel="titoli"
+          extra={
+            <button className="chip chip-random" data-focus onClick={() => void roll()} disabled={rolling} title="Scegli un titolo a caso">
+              <IconDice width={16} height={16} /> Random
+            </button>
+          }
         />
         <Grid items={items} />
         <div ref={sentinel} className="sentinel">

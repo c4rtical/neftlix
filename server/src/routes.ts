@@ -220,6 +220,30 @@ export function registerApiRoutes(app: FastifyInstance, ctx: Ctx) {
     return { total, items: rows.map(seriesCard) };
   });
 
+  /** One random title of the given kind. Inside a category it draws from that category; from
+   *  "Tutti" it skips titles that live only in discreet categories, so a dice roll never exposes them. */
+  app.get('/api/random', async (req, reply) => {
+    const q = req.query as { kind?: string; category?: string };
+    const kind = q.kind === 'series' ? 'series' : 'movie';
+    if (kind === 'movie') {
+      const where = q.category
+        ? 'WHERE m.key IN (SELECT movie_key FROM movie_category WHERE category_id = ?)'
+        : `WHERE NOT EXISTS (SELECT 1 FROM movie_category mc JOIN category c ON c.id = mc.category_id AND c.kind = 'movie' WHERE mc.movie_key = m.key AND c.discreet = 1)
+             OR EXISTS (SELECT 1 FROM movie_category mc JOIN category c ON c.id = mc.category_id AND c.kind = 'movie' WHERE mc.movie_key = m.key AND c.discreet = 0)`;
+      const params = q.category ? [q.category] : [];
+      const row = db.prepare(`SELECT ${MOVIE_CARD_SQL} FROM movie m ${movieCardJoin(pid(req))} ${where} ORDER BY RANDOM() LIMIT 1`).get(...(params as never[])) as MovieRow | undefined;
+      if (!row) return reply.code(404).send({ error: 'Nessun film' });
+      return movieCard(row);
+    }
+    const where = q.category
+      ? 'WHERE s.category_id = ?'
+      : `WHERE NOT EXISTS (SELECT 1 FROM category c WHERE c.id = s.category_id AND c.kind = 'series' AND c.discreet = 1)`;
+    const params = q.category ? [q.category] : [];
+    const row = db.prepare(`SELECT ${SERIES_CARD_SQL} FROM series s ${where} ORDER BY RANDOM() LIMIT 1`).get(...(params as never[])) as SeriesRow | undefined;
+    if (!row) return reply.code(404).send({ error: 'Nessuna serie' });
+    return seriesCard(row);
+  });
+
   app.get('/api/series/:id', async (req, reply) => {
     const id = Number((req.params as { id: string }).id);
     const client = ctx.getClient();
@@ -566,6 +590,29 @@ export function registerApiRoutes(app: FastifyInstance, ctx: Ctx) {
   });
 
   app.get('/api/favorites', async (req) => ({ items: favoriteCards(db, pid(req)) }));
+
+  /** One thing to play right now from the favorites (or the watchlist): a movie as is, a series
+   *  through one of its episodes drawn at random, fetching the episode list first if it is missing. */
+  app.get('/api/favorites/random', async (req, reply) => {
+    const table = (req.query as { tab?: string }).tab === 'watchlist' ? 'watchlist' : 'favorite';
+    const f = db.prepare(`SELECT item_type, item_id FROM ${table} WHERE profile_id = ? ORDER BY RANDOM() LIMIT 1`).get(pid(req)) as
+      | { item_type: 'movie' | 'series'; item_id: string }
+      | undefined;
+    if (!f) return reply.code(404).send({ error: 'Lista vuota' });
+    if (f.item_type === 'movie') return { type: 'movie', id: f.item_id };
+    const seriesId = Number(f.item_id);
+    const client = ctx.getClient();
+    if (client) {
+      try {
+        await ensureEpisodes(db, client, seriesId);
+      } catch (e) {
+        req.log.warn({ id: seriesId, err: String(e) }, 'episodes fetch failed');
+      }
+    }
+    const ep = db.prepare('SELECT id FROM episode WHERE series_id = ? ORDER BY RANDOM() LIMIT 1').get(seriesId) as { id: number } | undefined;
+    if (!ep) return reply.code(404).send({ error: 'Nessun episodio disponibile' });
+    return { type: 'episode', id: String(ep.id), seriesId: f.item_id };
+  });
 
   app.post('/api/favorites', async (req, reply) => {
     const b = (req.body ?? {}) as { type?: string; id?: string };

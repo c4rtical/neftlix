@@ -41,6 +41,7 @@ export const api = {
   categories: (kind: 'movie' | 'series') => request<Category[]>(`/api/categories${qs({ kind })}`),
   movies: (p: { category?: string; q?: string; sort?: string; offset?: number; limit?: number }) => request<{ total: number; items: Card[] }>(`/api/movies${qs(p)}`),
   series: (p: { category?: string; q?: string; sort?: string; offset?: number; limit?: number }) => request<{ total: number; items: Card[] }>(`/api/series${qs(p)}`),
+  random: (kind: 'movie' | 'series', category?: string) => request<Card>(`/api/random${qs({ kind, category })}`),
   movie: (key: string) => request<MovieDetail>(`/api/movies/${encodeURIComponent(key)}`),
   seriesDetail: (id: string) => request<SeriesDetail>(`/api/series/${id}`),
   episode: (id: string | number) => request<EpisodeDetail>(`/api/episodes/${id}`),
@@ -56,6 +57,8 @@ export const api = {
   watchlist: () => request<{ items: Card[] }>('/api/watchlist'),
   addWatchlist: (type: 'movie' | 'series', id: string) => request<{ watchlist: boolean }>('/api/watchlist', { method: 'POST', body: JSON.stringify({ type, id }) }),
   removeWatchlist: (type: 'movie' | 'series', id: string) => request<{ watchlist: boolean }>(`/api/watchlist/${type}/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  favoritesRandom: (tab: 'favorites' | 'watchlist') =>
+    request<{ type: 'movie' | 'episode'; id: string; seriesId?: string }>(`/api/favorites/random${qs({ tab: tab === 'watchlist' ? 'watchlist' : undefined })}`),
   addFavorite: (type: 'movie' | 'series', id: string) => request<{ favorite: boolean }>('/api/favorites', { method: 'POST', body: JSON.stringify({ type, id }) }),
   removeFavorite: (type: 'movie' | 'series', id: string) => request<{ favorite: boolean }>(`/api/favorites/${type}/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   progress: (type: 'movie' | 'episode', id: string | number, position: number, duration: number) =>

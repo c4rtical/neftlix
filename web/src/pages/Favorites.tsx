@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api';
 import type { Card } from '../types';
 import { PosterCard } from '../components/Card';
+import { IconDice } from '../components/Icons';
 
 type Tab = 'favorites' | 'watchlist';
 
@@ -22,6 +23,7 @@ export function Favorites() {
   const tab: Tab = params.get('tab') === 'watchlist' ? 'watchlist' : 'favorites';
   const [items, setItems] = useState<Card[] | null>(null);
   const nav = useNavigate();
+  const [rolling, setRolling] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -38,6 +40,18 @@ export function Favorites() {
     setItems((prev) => prev?.filter((x) => !(x.type === c.type && x.id === c.id)) ?? null);
   };
 
+  // "Random": play something from this list right away; a series goes through one of its episodes.
+  const roll = async () => {
+    if (rolling) return;
+    setRolling(true);
+    try {
+      const r = await api.favoritesRandom(tab);
+      nav(`/play/${r.type}/${encodeURIComponent(r.id)}`);
+    } catch {
+      setRolling(false);
+    }
+  };
+
   return (
     <div className="page">
       <div className="browse-head">
@@ -49,6 +63,11 @@ export function Favorites() {
           <button className={`chip ${tab === 'watchlist' ? 'active' : ''}`} data-focus onClick={() => setParams({ tab: 'watchlist' }, { replace: true })}>
             Da guardare
           </button>
+          {items && items.length > 0 && (
+            <button className="chip chip-random" data-focus onClick={() => void roll()} disabled={rolling} title="Riproduci qualcosa a caso da questa lista">
+              <IconDice width={16} height={16} /> Random
+            </button>
+          )}
         </div>
         <span className="muted">{items ? `${items.length} titoli` : ''}</span>
       </div>

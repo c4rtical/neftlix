@@ -159,3 +159,10 @@ export const IconChannelDown = (p: SVGProps<SVGSVGElement>) => (
     <path d="M12 5v14M5.5 12.5 12 19l6.5-6.5" />
   </svg>
 );
+
+export const IconDice = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}>
+    <rect x="3" y="3" width="18" height="18" rx="3" />
+    <path d="M8 8h.01M16 8h.01M12 12h.01M8 16h.01M16 16h.01" />
+  </svg>
+);
