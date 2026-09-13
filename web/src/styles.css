@@ -654,9 +654,16 @@ input {
     translate: 0 -12px;
   }
 }
+/* Narrower screens have no room beside the list: the portal shrinks and tucks into the
+   top-right corner of the seasons block, next to the tabs, which wrap before reaching it. */
 @media (max-width: 1300px) {
   .portal {
-    display: none;
+    top: -14px;
+    right: 4px;
+    width: clamp(64px, 8vw, 96px);
+  }
+  .season-tabs {
+    padding-right: clamp(80px, 9vw, 110px);
   }
 }
 .episode {
