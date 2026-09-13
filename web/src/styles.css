@@ -2207,6 +2207,36 @@ input {
   color: var(--fg);
 }
 
+/* Favorites / watchlist: one titled group per kind (movies, series) */
+.fav-group + .fav-group {
+  margin-top: 20px;
+}
+.fav-group-toggle {
+  margin: 8px 0 0;
+  gap: 6px;
+}
+.fav-group-toggle h3 {
+  margin: 0;
+}
+.fav-group-toggle .chev {
+  transform: rotate(90deg);
+  transition: transform 0.15s;
+}
+.fav-group.collapsed .fav-group-toggle .chev {
+  transform: none;
+}
+.fav-group-toggle:hover h3,
+.fav-group-toggle:focus-visible h3 {
+  color: var(--fg);
+}
+.fav-group-count {
+  margin-left: 6px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  opacity: 0.7;
+}
+
 /* Favorites / watchlist grid with remove button */
 .removable {
   position: relative;
