@@ -4,6 +4,7 @@ import { api, formatDuration } from '../api';
 import type { Episode, SeriesDetail as SeriesT } from '../types';
 import { ProgressBar } from '../components/Card';
 import { focusFirst } from '../spatial';
+import { IconDice } from '../components/Icons';
 
 function EpisodeRow({ ep, onWatched }: { ep: Episode; onWatched: (ep: Episode, watched: boolean) => void }) {
   const nav = useNavigate();
@@ -96,13 +97,14 @@ export function SeriesDetail() {
   const current = s.seasons.find((x) => x.season === season) ?? s.seasons[0];
   const totalEps = s.seasons.reduce((n, x) => n + x.episodes.length, 0);
 
-  // Easter egg: on Rick and Morty a portal floats beside the episodes and drops you into a random one.
-  const portal = /\brick\s*(and|&|e)\s*morty\b/i.test(s.title) && totalEps > 0;
-  const openPortal = () => {
+  // "Random" plays an episode drawn from every season of the series.
+  const playRandom = () => {
     const all = s.seasons.flatMap((se) => se.episodes);
     const ep = all[Math.floor(Math.random() * all.length)];
     if (ep) nav(`/play/episode/${ep.id}`);
   };
+  // Easter egg: on Rick and Morty a portal floats beside the episodes and does the same.
+  const portal = /\brick\s*(and|&|e)\s*morty\b/i.test(s.title) && totalEps > 0;
 
   return (
     <div className="page detail" style={bg ? { backgroundImage: `url(${bg})` } : undefined}>
@@ -126,6 +128,11 @@ export function SeriesDetail() {
             <button className="btn" data-focus onClick={toggleWatchlist}>
               {s.watchlist ? '✓ Da guardare' : '+ Da guardare'}
             </button>
+            {totalEps > 0 && (
+              <button className="btn" data-focus onClick={playRandom} title="Riproduci un episodio a caso">
+                <IconDice width={16} height={16} /> Random
+              </button>
+            )}
           </div>
           {s.plot && <p className="detail-plot">{s.plot}</p>}
           {s.cast && (
@@ -158,7 +165,7 @@ export function SeriesDetail() {
             ))}
           </div>
           {portal && (
-            <button className="portal" data-focus onClick={openPortal} title="Wubba lubba dub dub" aria-label="Apri un episodio a caso">
+            <button className="portal" data-focus onClick={playRandom} title="Wubba lubba dub dub" aria-label="Apri un episodio a caso">
               <img src="/portal.png" alt="" />
             </button>
           )}
