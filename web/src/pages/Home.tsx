@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
-import type { Card, HomeRow, Match, Status } from '../types';
+import type { Card, HomeRow, Status } from '../types';
 import { Row } from '../components/Row';
 import { SportStrip } from '../components/SportStrip';
+import type { StripItem } from '../components/SportStrip';
 import { cardHref } from '../components/Card';
 import { focusFirst } from '../spatial';
 
@@ -33,21 +34,23 @@ function Hero({ card }: { card: Card }) {
 
 export function Home({ status }: { status: Status }) {
   const [rows, setRows] = useState<HomeRow[] | null>(null);
-  const [matches, setMatches] = useState<Match[]>([]);
+  const [strip, setStrip] = useState<StripItem[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
+    const SPORT_TAG = { f1: 'F1', motogp: 'MotoGP', tennis: 'Tennis' };
     const load = () =>
-      api
-        .liveMatches(1, true)
-        .then((r) => {
+      Promise.all([api.liveMatches(1, true).catch(() => ({ items: [] })), api.liveEvents(1, true).catch(() => ({ items: [] }))])
+        .then(([matches, events]) => {
           if (!alive) return;
           const at = Math.floor(Date.now() / 1000);
-          // Only what matters right now: live, or kicking off within 3 hours.
-          const soon = r.items.filter((m) => m.channels.length > 0 && m.start >= at - 2 * 3600 && m.start <= at + 3 * 3600);
-          soon.sort((a, b) => Number(b.live) - Number(a.live) || a.start - b.start);
-          setMatches(soon.slice(0, 3));
+          // Only what matters right now: live, or starting within 3 hours, with a channel to open.
+          const items: StripItem[] = [...matches.items, ...events.items.map((e) => ({ ...e, title: `${SPORT_TAG[e.sport]} ${e.title} · ${e.sessionLabel}` }))].filter(
+            (m) => m.channels.length > 0 && m.start >= at - 2 * 3600 && m.start <= at + 3 * 3600,
+          );
+          items.sort((a, b) => Number(b.live) - Number(a.live) || a.start - b.start);
+          setStrip(items.slice(0, 4));
         })
         .catch(() => {});
     load();
@@ -87,7 +90,7 @@ export function Home({ status }: { status: Status }) {
         </div>
       )}
       {hero && <Hero card={hero} />}
-      {matches.length > 0 && <SportStrip matches={matches} />}
+      {strip.length > 0 && <SportStrip items={strip} />}
       {rows.map((r) => (
         <Row key={r.key} title={r.title} items={r.items} link={r.link} wide={r.key === 'continue'} />
       ))}

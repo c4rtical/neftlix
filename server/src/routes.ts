@@ -7,6 +7,7 @@ import { epgState, nowNextFor } from './epg.ts';
 import { upcomingMatches } from './matches.ts';
 import { getTmdbKey, setTmdbKey, tmdbState, verifyTmdbKey } from './tmdb.ts';
 import { MAIN_COMPETITIONS, channelsForFixture, fallbackCategories, fixtureState, getFixturesKey, loadFixtures, setFixturesKey, sportCategoryIds } from './fixtures.ts';
+import { SPORT_NAMES, channelsForEvent, eventState, loadEvents } from './events.ts';
 import { profileRow } from './profiles.ts';
 
 type Ctx = {
@@ -99,6 +100,7 @@ export function registerApiRoutes(app: FastifyInstance, ctx: Ctx) {
       sync: syncState,
       epg: epgState,
       fixtures: { ...fixtureState, hasKey: Boolean(getFixturesKey(db)) },
+      events: { ...eventState },
       tmdb: { ...tmdbState, hasKey: Boolean(getTmdbKey(db)) },
       counts,
     };
@@ -549,6 +551,39 @@ export function registerApiRoutes(app: FastifyInstance, ctx: Ctx) {
         };
       });
     return { items, source: fixtureState.source, error: fixtureState.error, lastRun: fixtureState.lastRun };
+  });
+
+  // Motorsport sessions and main tennis tournaments mapped to live channels. `?main=1` keeps only
+  // what belongs on the home strip: F1 and MotoGP sessions other than practice.
+  app.get('/api/live/events', async (req) => {
+    const q = req.query as { days?: string; refresh?: string; main?: string };
+    const days = Math.min(Math.max(Number(q.days) || 7, 1), 14);
+    const onlyMain = q.main === '1';
+    const events = await loadEvents(14, q.refresh === '1');
+    const at = now();
+    const items = events
+      .filter((e) => e.status !== 'CANCELLED' && e.start <= at + days * 86400)
+      .filter((e) => (e.session === 'tournament' ? e.stop >= at : e.start >= at - 3 * 3600))
+      .filter((e) => !onlyMain || (e.sport !== 'tennis' && e.session !== 'practice'))
+      .map((e) => {
+        const channels = channelsForEvent(db, e, at);
+        const live = e.session === 'tournament' ? channels.some((c) => c.start <= at) : e.status === 'IN_PLAY' || (e.start <= at && at < e.stop && e.status !== 'FINISHED');
+        return {
+          key: e.id,
+          sport: e.sport,
+          session: e.session,
+          sessionLabel: e.sessionLabel,
+          title: e.title,
+          name: e.name,
+          competition: e.sport === 'tennis' ? `Tennis · ${e.sessionLabel}` : `${SPORT_NAMES[e.sport]} · ${e.sessionLabel}`,
+          start: e.start,
+          stop: e.stop,
+          status: e.status,
+          live,
+          channels: channels.map((c) => ({ id: c.id, name: c.name, logo: c.logo })),
+        };
+      });
+    return { items, source: eventState.source, error: eventState.error, lastRun: eventState.lastRun };
   });
 
   app.post('/api/settings/fixtures-key', async (req) => {

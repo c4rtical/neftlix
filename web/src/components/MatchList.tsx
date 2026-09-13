@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { formatTime } from '../api';
 import type { Match } from '../types';
 
-function dayLabel(unix: number): string {
+export function dayLabel(unix: number): string {
   const d = new Date(unix * 1000);
   const today = new Date();
   const tomorrow = new Date(today);

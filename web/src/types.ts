@@ -54,6 +54,7 @@ export type Status = {
   sync: SyncState;
   epg?: { running: boolean; lastRun: number | null; programmes: number; error: string | null };
   fixtures?: { source: string | null; lastRun: number | null; count: number; error: string | null; hasKey: boolean };
+  events?: { source: string | null; lastRun: number | null; count: number; error: string | null };
   tmdb?: {
     hasKey: boolean;
     lastError: string | null;
@@ -158,6 +159,24 @@ export type Match = {
   awayCrest?: string | null;
   channels: { id: number; name: string; logo: string | null }[];
   fallback?: { label: string; categoryId: string } | null;
+};
+
+export type SportEventItem = {
+  key: string;
+  sport: 'f1' | 'motogp' | 'tennis';
+  session: 'practice' | 'qualifying' | 'sprintqualifying' | 'sprint' | 'race' | 'tournament';
+  /** "Gara", "Prove libere 2", or the tour ("ATP · WTA") for tennis. */
+  sessionLabel: string;
+  /** Italian name: "GP Spagna", "US Open". */
+  title: string;
+  /** Name as the source spells it, shown when it adds something. */
+  name: string;
+  competition: string;
+  start: number;
+  stop: number;
+  status: string;
+  live: boolean;
+  channels: { id: number; name: string; logo: string | null }[];
 };
 
 export type EpgItem = { title: string; description: string; start: number | null; end: number | null; nowPlaying: boolean };

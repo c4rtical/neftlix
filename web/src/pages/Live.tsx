@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api, formatTime } from '../api';
-import type { Category, LiveChannel, Match } from '../types';
+import type { Category, LiveChannel, Match, SportEventItem } from '../types';
 import { MatchList } from '../components/MatchList';
+import { EventList } from '../components/EventList';
 import { BrowseHeader, CategorySidebar } from '../components/BrowseHeader';
 
 function ChannelCard({ ch, at }: { ch: LiveChannel; at: number }) {
@@ -34,20 +35,27 @@ export function Live({ mode = 'sport' }: { mode?: 'sport' | 'tv' }) {
   const [params, setParams] = useSearchParams();
   const category = params.get('category') ?? '';
   const all = mode === 'tv';
-  const tab = mode === 'sport' && params.get('tab') === 'matches' ? 'matches' : 'channels';
+  const tabParam = params.get('tab');
+  const tab = mode === 'sport' && (tabParam === 'matches' || tabParam === 'events') ? tabParam : 'channels';
   const q = params.get('q') ?? '';
   const [matches, setMatches] = useState<Match[] | null>(null);
   const [matchSource, setMatchSource] = useState<string | null>(null);
   const [matchError, setMatchError] = useState<string | null>(null);
   const [onlyWithChannel, setOnlyWithChannel] = useState(false);
+  const [events, setEvents] = useState<SportEventItem[] | null>(null);
 
   useEffect(() => {
-    if (tab !== 'matches') return;
+    if (tab === 'channels') return;
     let alive = true;
     setMatches(null);
-    api.liveMatches(7).then((r) => {
+    setEvents(null);
+    setMatchSource(null);
+    setMatchError(null);
+    const req = tab === 'matches' ? api.liveMatches(7) : api.liveEvents(7);
+    req.then((r) => {
       if (!alive) return;
-      setMatches(r.items);
+      if (tab === 'matches') setMatches(r.items as Match[]);
+      else setEvents(r.items as SportEventItem[]);
       setMatchSource(r.source ?? null);
       setMatchError(r.error ?? null);
     });
@@ -135,13 +143,19 @@ export function Live({ mode = 'sport' }: { mode?: 'sport' | 'tv' }) {
               <button className={`chip ${tab === 'matches' ? 'active' : ''}`} data-focus onClick={() => setParam('tab', 'matches')}>
                 Partite
               </button>
+              <button className={`chip ${tab === 'events' ? 'active' : ''}`} data-focus onClick={() => setParam('tab', 'events')}>
+                Motori e tennis
+              </button>
             </div>
           ) : undefined
         }
       >
-        {tab === 'matches' ? (
+        {tab !== 'channels' ? (
           <>
-            <p className="muted small">Calendario ufficiale{matchSource ? ` (${matchSource})` : ''}, abbinato ai canali tramite la guida TV. Clic sulla partita per guardare.</p>
+            <p className="muted small">
+              {tab === 'matches' ? 'Calendario ufficiale' : 'Formula 1, MotoGP e i principali tornei di tennis'}
+              {matchSource ? ` (${matchSource})` : ''}, abbinato ai canali tramite la guida TV. Clic sull'evento per guardare.
+            </p>
             {matchError && <p className="error small">{matchError}</p>}
             <label className="muted small check">
               <input type="checkbox" checked={onlyWithChannel} onChange={(e) => setOnlyWithChannel(e.target.checked)} /> Solo con canale trovato
@@ -166,6 +180,13 @@ export function Live({ mode = 'sport' }: { mode?: 'sport' | 'tv' }) {
             <h2>Partite della settimana</h2>
           </div>
           {matches === null ? <div className="muted">Caricamento…</div> : <MatchList items={onlyWithChannel ? matches.filter((m) => m.channels.length > 0 || m.fallback) : matches} />}
+        </div>
+      ) : tab === 'events' ? (
+        <div className="browse-main">
+          <div className="browse-head">
+            <h2>Motori e tennis della settimana</h2>
+          </div>
+          {events === null ? <div className="muted">Caricamento…</div> : <EventList items={onlyWithChannel ? events.filter((e) => e.channels.length > 0) : events} />}
         </div>
       ) : (
       <div className="browse-main">

@@ -132,7 +132,7 @@ It started as "a nicer list of movies". Then I wanted the football fixtures. The
 
 <table>
 <tr>
-<td width="50%"><img src="docs/screenshots/sport.png" alt="Sport: this week's fixtures matched to the broadcasting channel" /><br/><b>Sport fixtures.</b> Real kick-off times from a football calendar, matched to the channel that broadcasts the game. Live matches show up on the home page.</td>
+<td width="50%"><img src="docs/screenshots/sport.png" alt="Sport: this week's fixtures matched to the broadcasting channel" /><br/><b>Sport fixtures.</b> Real kick-off times from a football calendar, matched to the channel that broadcasts the game. Formula 1 and MotoGP sessions and the main tennis tournaments get the same treatment in their own tab. Live matches and races show up on the home page.</td>
 <td width="50%"><b>Open from the TV.</b> Settings → <i>Apri dalla TV</i> → <i>Attiva</i>. The desktop app shows an address such as <code>http://192.168.1.20:53412</code> and a 6-digit PIN: open it in the TV's browser (LG, Samsung, Fire TV Silk, any tablet or phone on the same Wi-Fi), enter the PIN once, pick a profile. The computer stays the brain and must stay on; the video goes from your provider straight to the TV. Windows asks once to allow <code>Neftlix</code> through the firewall on private networks.</td>
 </tr>
 <tr>

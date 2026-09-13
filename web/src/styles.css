@@ -1601,8 +1601,12 @@ input {
 /* Matches */
 .tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
   margin: 6px 0;
+}
+.tabs .chip {
+  white-space: nowrap;
 }
 .check {
   display: flex;
@@ -1706,6 +1710,29 @@ input {
 .match-fallback {
   border: 1px dashed var(--muted);
   background: transparent;
+}
+/* Motori e tennis */
+.event-sport {
+  display: inline-block;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 4px;
+  margin-right: 10px;
+  vertical-align: middle;
+  color: #fff;
+  background: var(--bg-3);
+}
+.event-sport-f1 {
+  background: #c8102e;
+}
+.event-sport-motogp {
+  background: #1f6feb;
+}
+.event-sport-tennis {
+  background: #2e8b57;
 }
 .keyrow {
   display: flex;

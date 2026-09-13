@@ -142,6 +142,7 @@ CREATE TABLE IF NOT EXISTS epg_programme (
   PRIMARY KEY (channel_id, start)
 );
 CREATE INDEX IF NOT EXISTS epg_stop ON epg_programme(channel_id, stop);
+CREATE INDEX IF NOT EXISTS epg_start ON epg_programme(start);
 
 CREATE TABLE IF NOT EXISTS profile (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

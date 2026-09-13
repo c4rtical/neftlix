@@ -10,10 +10,12 @@ All notable changes to this project are documented here. The format follows [Kee
 - "Random" in Film and Serie TV, at the end of the sort chips: opens the detail page of a title drawn at random from the selected category, or from the whole catalogue with "Tutti", discreet categories excluded in that case (`GET /api/random?kind=movie|series&category=`).
 - "Random" in Preferiti and Da guardare: plays something from the list right away; a series goes through one of its episodes drawn at random (`GET /api/favorites/random?tab=`).
 - Easter egg: on Rick and Morty a portal floats beside the episode list and drops you into a random episode.
+- "Motori e tennis", a third tab in Sport next to "Partite": every Formula 1 and MotoGP session of the week (practice, qualifying, sprint, race) and the main tennis tournaments (Slams, Masters 1000 and WTA 1000, Finals, team cups), matched to the channel that broadcasts them through the TV guide (`GET /api/live/events`). Motorsport comes from ESPN (F1, with TheSportsDB as fallback) and TheSportsDB (MotoGP), tennis from ESPN, all without a key: the football-data.org key covers football only. Sessions live now or about to start join the "Sport adesso" strip on the home page. Tennis is shown per tournament, since the guide names the tournament and not the match.
 - Discreet categories: a small built-in list of category names is treated as discreet. These categories are now browsable like any other in Film, Serie and Live TV (they used to be left out of every listing, and the provider rows flagged the same way were skipped at import), but their titles leave no trace: playback position is not recorded, so they never appear in "Continua a guardare" nor offer "Riprendi", and a search that only finds such titles is not kept in "Ricerche recenti". Resume points saved before this rule are removed at startup and after each sync. The explicit "Segna come visto" still works.
 
 ### Changed
 - Database: `category.hidden` is renamed to `category.discreet` (automatic migration).
+- Channel buttons on a match no longer repeat the same channel under provider group suffixes ("Skynet", "STAR", "locale") or country prefixes.
 
 ### Fixed
 - Plots, cast and titles that the provider ships with literal unicode escapes ("laziale u00e8 in luna", with or without the backslash) are decoded at import; rows already stored are repaired at startup.

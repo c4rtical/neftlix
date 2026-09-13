@@ -104,13 +104,13 @@ type TsdbEvent = {
 export const TSDB_PACING = { gapMs: 1500, retryMs: 5000 };
 const TSDB_LIMIT_MSG = 'TheSportsDB: limite richieste del piano gratuito raggiunto. Riprova tra qualche minuto o imposta una chiave football-data.org nelle impostazioni';
 
-class TsdbRateLimited extends Error {}
+export class TsdbRateLimited extends Error {}
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 let lastTsdbAt = 0;
 
 /** One paced request. Network/HTTP errors yield null (skip the league); a repeated 429 throws TsdbRateLimited. */
-async function tsdb<T>(path: string): Promise<T | null> {
+export async function tsdb<T>(path: string): Promise<T | null> {
   for (let attempt = 0; ; attempt++) {
     const wait = lastTsdbAt + TSDB_PACING.gapMs - Date.now();
     if (wait > 0) await sleep(wait);
@@ -454,8 +454,16 @@ const SPORT_CATEGORY_RE = /sport|calcio|dazn|eurosport|football|soccer|campionat
 
 export type FixtureChannel = { id: number; name: string; logo: string | null; programme: string; start: number };
 
-function channelBase(name: string): string {
-  return normName(name.replace(/\b(HD|FHD|UHD|4K|SAT|HEVC|H265|\+|SD|HQ)\b/gi, ''));
+/**
+ * One key per real channel: quality tags, provider group suffixes ("Skynet", "STAR", "locale") and
+ * country prefixes ("CH: ") are dropped, spaces too ("RSI La2" and "RSI LA 2" are the same channel).
+ */
+export function channelBase(name: string): string {
+  return normName(
+    name
+      .replace(/^[^a-z0-9]*[a-z]{2}:\s*/i, '')
+      .replace(/\b(HD|FHD|UHD|4K|SAT|HEVC|H265|\+|SD|HQ|SUPERHD|SKYNET|STAR|LOCALE)\b/gi, ''),
+  ).replace(/ /g, '');
 }
 
 /** Programmes on sport channels starting within [-25 min, +40 min] of kick-off whose title names both teams. */

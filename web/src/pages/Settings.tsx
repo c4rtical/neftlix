@@ -380,13 +380,19 @@ export function Settings({ status, onChanged }: { status: Status; onChanged: () 
           <dd>{fx?.source ?? '—'}{fx?.error ? ` · errore: ${fx.error}` : ''}</dd>
           <dt>Partite in cache</dt>
           <dd>{fx?.count ?? 0}</dd>
+          <dt>Motori e tennis</dt>
+          <dd>
+            {status.events?.source ? `${status.events.count} eventi da ${status.events.source}` : '—'}
+            {status.events?.error ? ` · errore: ${status.events.error}` : ''}
+          </dd>
           <dt>Guida TV (EPG)</dt>
           <dd>{status.epg?.programmes ? `${status.epg.programmes.toLocaleString('it-IT')} programmi, aggiornata ${fmtDate(status.epg.lastRun)}` : 'non disponibile'}</dd>
         </dl>
         <p className="muted small">
           Senza chiave vengono usati i dati gratuiti di TheSportsDB, con ESPN come riserva se TheSportsDB non risponde (Serie A, Coppa Italia, Champions, Europa League,
           Premier, Liga, Bundesliga, Ligue 1). Con una chiave gratuita di football-data.org (registrazione su football-data.org/client/register) il calendario è più
-          completo e aggiornato.
+          completo e aggiornato. Formula 1, MotoGP e i principali tornei di tennis arrivano sempre da ESPN e TheSportsDB, senza chiave: la chiave riguarda solo il
+          calcio.
         </p>
         <div className="keyrow">
           <input data-focus type="password" placeholder={fx?.hasKey ? 'Chiave impostata: incolla per sostituire, vuoto per rimuovere' : 'Chiave API football-data.org'} value={fdKey} onChange={(e) => setFdKey(e.target.value)} />
