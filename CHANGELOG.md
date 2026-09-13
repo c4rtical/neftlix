@@ -4,6 +4,11 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.5.4] - 2026-09-13
+
+### Added
+- "Random" on every series page, next to Preferiti and Da guardare: plays an episode drawn at random from all its seasons. The Rick and Morty portal stays as the easter egg.
+
 ## [0.5.3] - 2026-09-13
 
 ### Added
