@@ -4,6 +4,11 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-09-13
+
+### Added
+- Rows get ‹ › arrows on hover, for anyone with a mouse and no trackpad: each scrolls by one page, hides at its end of the row, and neither shows when everything fits. Mouse only: they do not exist on touch screens and never take the focus, so keyboard and remote navigation are unchanged.
+
 ## [0.5.1] - 2026-09-13
 
 ### Fixed
