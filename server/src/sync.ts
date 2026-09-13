@@ -66,6 +66,40 @@ export function purgeDiscreetProgress(db: Db): number {
 
 const QUALITY_TAGS = /\b(4K|UHD|2160p|1080p|720p|HDR|HEVC|H\.?265|x265|REMUX|BLURAY|WEB-?DL|HDTS|CAM|ITA|ENG|SUB-?ITA)\b/gi;
 
+/**
+ * Some providers ship JSON unicode escapes as literal text, often without the backslash
+ * ("laziale u00e8 in luna"). With a backslash any escape is decoded; without it only the
+ * Latin-1 accents (u00a0-u00ff) and typographic punctuation (u2010-u203a) are, so ordinary
+ * text such as "u1234" is left alone. Empty input becomes null, matching how plots are stored.
+ */
+export function unescapeText(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const out = raw.replace(/\\u([0-9a-fA-F]{4})|u(00[a-fA-F][0-9a-fA-F]|20[1-3][0-9a-fA-F])/g, (_, esc: string | undefined, bare: string | undefined) =>
+    String.fromCharCode(parseInt((esc ?? bare) as string, 16)),
+  );
+  return out || null;
+}
+
+/** Decodes escapes already stored by earlier syncs. Returns the number of rows changed. */
+export function repairEscapedText(db: Db): number {
+  let n = 0;
+  const fix = (table: string, idCol: string, cols: string[]) => {
+    const cond = cols.map((c) => `${c} LIKE '%u00__%' OR ${c} LIKE '%u20__%'`).join(' OR ');
+    const rows = db.prepare(`SELECT ${idCol} AS id, ${cols.join(', ')} FROM ${table} WHERE ${cond}`).all() as Record<string, unknown>[];
+    const upd = db.prepare(`UPDATE ${table} SET ${cols.map((c) => `${c} = ?`).join(', ')} WHERE ${idCol} = ?`);
+    for (const r of rows) {
+      const next = cols.map((c) => unescapeText(r[c.replace(/"/g, '')] as string | null));
+      if (cols.every((c, i) => next[i] === (r[c.replace(/"/g, '')] ?? null))) continue;
+      upd.run(...next, r.id as string | number);
+      n++;
+    }
+  };
+  fix('movie', 'key', ['title', 'plot', '"cast"']);
+  fix('series', 'id', ['title', 'plot', '"cast"']);
+  fix('episode', 'id', ['title', 'plot']);
+  return n;
+}
+
 export type ParsedTitle = { title: string; year: number | null; label: string | null };
 
 export function parseTitle(raw: string): ParsedTitle {
@@ -395,8 +429,8 @@ function importSeries(db: Db, rows: XtreamSeries[]) {
         year,
         s.cover || null,
         backdropOf(s.backdrop_path),
-        s.plot || null,
-        s.cast || null,
+        unescapeText(s.plot),
+        unescapeText(s.cast),
         s.director || null,
         s.genre || null,
         releaseDate,
@@ -490,8 +524,8 @@ export async function ensureEpisodes(db: Db, client: XtreamClient, seriesId: num
         seriesId,
         toNumber(e.season),
         toNumber(e.episode_num),
-        cleanEpisodeTitle(e.title, toNumber(e.season), toNumber(e.episode_num)),
-        info.plot || null,
+        unescapeText(cleanEpisodeTitle(e.title, toNumber(e.season), toNumber(e.episode_num))) ?? '',
+        unescapeText(info.plot),
         e.container_extension || 'mp4',
         info.duration_secs ? Math.round(Number(info.duration_secs)) : null,
         info.movie_image || null,
@@ -504,7 +538,7 @@ export async function ensureEpisodes(db: Db, client: XtreamClient, seriesId: num
       UPDATE series SET episodes_fetched_at = ?, episodes_enriched_at = NULL,
         plot = COALESCE(?, plot), "cast" = COALESCE(?, "cast"), backdrop = COALESCE(?, backdrop)
       WHERE id = ?
-    `).run(now(), (detail as { plot?: string }).plot || null, (detail as { cast?: string }).cast || null, backdropOf((detail as { backdrop_path?: string[] }).backdrop_path) || null, seriesId);
+    `).run(now(), unescapeText((detail as { plot?: string }).plot), unescapeText((detail as { cast?: string }).cast), backdropOf((detail as { backdrop_path?: string[] }).backdrop_path) || null, seriesId);
     db.exec('COMMIT');
   } catch (e) {
     db.exec('ROLLBACK');
@@ -618,8 +652,8 @@ export async function ensureMovieDetail(db: Db, client: XtreamClient, key: strin
         year = COALESCE(year, ?), detail_fetched_at = ?
       WHERE key = ?
     `).run(
-      d.description || d.plot || null,
-      d.cast || d.actors || null,
+      unescapeText(d.description || d.plot),
+      unescapeText(d.cast || d.actors),
       d.director || null,
       d.genre || null,
       backdropOf(d.backdrop_path) || null,

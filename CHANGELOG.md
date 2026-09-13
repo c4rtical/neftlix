@@ -7,12 +7,16 @@ All notable changes to this project are documented here. The format follows [Kee
 ### Added
 - Episodes without a title, still or plot ("Show S01 E07") are completed from TMDB when a free key is set (Settings, or `TMDB_API_KEY`). A series is touched only when its numbering provably matches TMDB's: per season when every episode number fits the TMDB season, or as one flat absolute list when the count equals TMDB's total; provider titles already present are cross-checked and the series is left alone on disagreement. Provider data is never overwritten. TMDB responses are cached in the database for a week.
 - With a TMDB key set, a paced background pass fetches and completes the episodes of every series after each sync (favourites, watchlist and started series first), so a series is already whole when first opened. Progress in Settings; it resumes on restart and waits while a sync runs.
+- "Random" in Film and Serie TV, at the end of the sort chips: opens the detail page of a title drawn at random from the selected category, or from the whole catalogue with "Tutti", discreet categories excluded in that case (`GET /api/random?kind=movie|series&category=`).
+- "Random" in Preferiti and Da guardare: plays something from the list right away; a series goes through one of its episodes drawn at random (`GET /api/favorites/random?tab=`).
+- Easter egg: on Rick and Morty a portal floats beside the episode list and drops you into a random episode.
 - Discreet categories: a small built-in list of category names is treated as discreet. These categories are now browsable like any other in Film, Serie and Live TV (they used to be left out of every listing, and the provider rows flagged the same way were skipped at import), but their titles leave no trace: playback position is not recorded, so they never appear in "Continua a guardare" nor offer "Riprendi", and a search that only finds such titles is not kept in "Ricerche recenti". Resume points saved before this rule are removed at startup and after each sync. The explicit "Segna come visto" still works.
 
 ### Changed
 - Database: `category.hidden` is renamed to `category.discreet` (automatic migration).
 
 ### Fixed
+- Plots, cast and titles that the provider ships with literal unicode escapes ("laziale u00e8 in luna", with or without the backslash) are decoded at import; rows already stored are repaired at startup.
 - Episode titles like "Show S01 E7" (space between season and episode) are no longer shown verbatim; they become "Episodio 7".
 
 ## [0.4.0] - 2026-09-10
