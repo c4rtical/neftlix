@@ -4,6 +4,11 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.5.5] - 2026-09-17
+
+### Changed
+- Discreet categories are hidden by default: they and the titles filed only under them are left out of Film, Serie TV, Live TV, search, the home rows and "Random" (a title that also sits in a normal category stays visible). A new "Categorie riservate" panel in Impostazioni shows them again for the active profile only; every other profile keeps its own choice. Saved favourites and "Da guardare" keep their titles either way; the no-trace rules from 0.5.0 still apply when they are shown. Database: `profile.show_discreet` (automatic migration), `PATCH /api/profiles/:id` accepts `showDiscreet`.
+
 ## [0.5.4] - 2026-09-13
 
 ### Added
