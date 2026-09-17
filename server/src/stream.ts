@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { Readable } from 'node:stream';
+import { PassThrough } from 'node:stream';
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import type { Db } from './db.ts';
 import { PLAYER_USER_AGENT, type XtreamClient } from './xtream.ts';
@@ -27,14 +27,103 @@ function looksLikeVideo(res: Response): boolean {
   return Number(res.headers.get('content-length') ?? 0) > 1024;
 }
 
-async function openUpstream(url: string, req: FastifyRequest): Promise<Response> {
+export type StreamTimeouts = {
+  /** How long the provider may take to answer with headers. */
+  headersMs: number;
+  /** How long the provider may stay silent mid-stream while we are waiting for more bytes. */
+  idleMs: number;
+};
+
+const DEFAULT_TIMEOUTS: StreamTimeouts = { headersMs: 30_000, idleMs: 45_000 };
+
+type Upstream = { res: Response; abort: () => void };
+
+/**
+ * fetch() whose timeout covers only the wait for the headers. A plain AbortSignal.timeout() would
+ * also abort the body: every movie or episode was cut N seconds after it started and the browser
+ * had to fetch the rest with a new Range request, which it does not always manage to (playback
+ * froze until the page was reloaded).
+ */
+async function fetchUpstream(url: string, headers: Record<string, string>, headersMs: number): Promise<Upstream> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(new DOMException('Provider non risponde', 'TimeoutError')), headersMs);
+  try {
+    const res = await fetch(url, { headers, redirect: 'follow', signal: ctrl.signal });
+    return { res, abort: () => ctrl.abort() };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function openUpstream(url: string, req: FastifyRequest, t: StreamTimeouts): Promise<Upstream> {
   const headers: Record<string, string> = { 'User-Agent': PLAYER_USER_AGENT };
   const range = req.headers.range;
   if (range) headers.Range = String(range);
-  return fetch(url, { headers, redirect: 'follow', signal: AbortSignal.timeout(30_000) });
+  return fetchUpstream(url, headers, t.headersMs);
 }
 
-async function pipeUpstream(res: Response, reply: FastifyReply, ext: string) {
+/**
+ * Relays the upstream body to the client. The idle timer runs only while we are waiting for the
+ * provider: when the client stops reading (a browser whose buffer is full) we wait for it instead,
+ * so backpressure never trips the timer. When the client goes away the upstream request is aborted.
+ */
+function relayBody(up: Upstream, idleMs: number): PassThrough {
+  const out = new PassThrough();
+  if (!up.res.body) {
+    out.end();
+    return out;
+  }
+  const reader = up.res.body.getReader();
+  out.on('close', () => {
+    up.abort();
+    reader.cancel().catch(() => {});
+  });
+  const drained = () =>
+    new Promise<void>((resolve) => {
+      const done = () => {
+        out.off('drain', done);
+        out.off('close', done);
+        resolve();
+      };
+      out.once('drain', done);
+      out.once('close', done);
+    });
+  const readWithIdleTimeout = () =>
+    new Promise<Awaited<ReturnType<typeof reader.read>>>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        up.abort();
+        reject(new Error(`Provider muto da ${Math.round(idleMs / 1000)} s`));
+      }, idleMs);
+      reader.read().then(
+        (r) => {
+          clearTimeout(timer);
+          resolve(r);
+        },
+        (e) => {
+          clearTimeout(timer);
+          reject(e);
+        },
+      );
+    });
+  void (async () => {
+    try {
+      while (!out.destroyed) {
+        const { value, done } = await readWithIdleTimeout();
+        if (done) {
+          out.end();
+          return;
+        }
+        if (!out.write(value)) await drained();
+      }
+    } catch (e) {
+      if (!out.destroyed) out.destroy(e instanceof Error ? e : new Error(String(e)));
+    }
+  })();
+  return out;
+}
+
+async function pipeUpstream(up: Upstream, reply: FastifyReply, ext: string, t: StreamTimeouts) {
+  const res = up.res;
   reply.code(res.status);
   for (const h of PASS_HEADERS) {
     const v = res.headers.get(h);
@@ -45,9 +134,7 @@ async function pipeUpstream(res: Response, reply: FastifyReply, ext: string) {
   // Some panels send a non-standard Accept-Ranges value; browsers need the literal "bytes".
   reply.header('accept-ranges', 'bytes');
   reply.header('cache-control', 'no-store');
-  if (!res.body) return reply.send();
-  const body = Readable.fromWeb(res.body as never);
-  return reply.send(body);
+  return reply.send(relayBody(up, t.idleMs));
 }
 
 // ---- Live TV (HLS) ----
@@ -105,7 +192,7 @@ async function servePlaylist(url: string, reply: FastifyReply, log: FastifyReque
   return reply.send(rewritePlaylist(body, res.url || url));
 }
 
-export function registerStreamRoutes(app: FastifyInstance, ctx: Ctx) {
+export function registerStreamRoutes(app: FastifyInstance, ctx: Ctx, t: StreamTimeouts = DEFAULT_TIMEOUTS) {
   app.get('/stream/live/:id/index.m3u8', async (req, reply) => {
     const client = ctx.getClient();
     if (!client) return reply.code(503).send({ error: 'Account non configurato' });
@@ -123,12 +210,13 @@ export function registerStreamRoutes(app: FastifyInstance, ctx: Ctx) {
   app.get('/stream/live/seg', async (req, reply) => {
     const url = verifyParams(req);
     if (!url) return reply.code(403).send({ error: 'URL non firmato' });
-    let res: Response;
+    let up: Upstream;
     try {
-      res = await fetch(url, { headers: { 'User-Agent': PLAYER_USER_AGENT }, redirect: 'follow', signal: AbortSignal.timeout(30_000) });
+      up = await fetchUpstream(url, { 'User-Agent': PLAYER_USER_AGENT }, t.headersMs);
     } catch (e) {
       return reply.code(502).send({ error: `Errore provider: ${String(e)}` });
     }
+    const res = up.res;
     if (!res.ok) {
       await res.body?.cancel().catch(() => {});
       return reply.code(502).send({ error: `Segmento non disponibile (HTTP ${res.status})` });
@@ -138,7 +226,7 @@ export function registerStreamRoutes(app: FastifyInstance, ctx: Ctx) {
     const len = res.headers.get('content-length');
     if (len) reply.header('content-length', len);
     reply.header('cache-control', 'no-store');
-    return reply.send(res.body ? Readable.fromWeb(res.body as never) : undefined);
+    return reply.send(relayBody(up, t.idleMs));
   });
 
   // Raw MPEG-TS passthrough (for native clients that prefer it over HLS).
@@ -146,12 +234,13 @@ export function registerStreamRoutes(app: FastifyInstance, ctx: Ctx) {
     const client = ctx.getClient();
     if (!client) return reply.code(503).send({ error: 'Account non configurato' });
     const id = Number((req.params as { id: string }).id);
-    let res: Response;
+    let up: Upstream;
     try {
-      res = await fetch(client.liveUrl(id, 'ts'), { headers: { 'User-Agent': PLAYER_USER_AGENT }, redirect: 'follow', signal: AbortSignal.timeout(20_000) });
+      up = await fetchUpstream(client.liveUrl(id, 'ts'), { 'User-Agent': PLAYER_USER_AGENT }, t.headersMs);
     } catch (e) {
       return reply.code(502).send({ error: `Errore provider: ${String(e)}` });
     }
+    const res = up.res;
     if (!looksLikeVideo(res)) {
       await res.body?.cancel().catch(() => {});
       return reply.code(502).send({ error: `Canale non disponibile (HTTP ${res.status})` });
@@ -159,7 +248,7 @@ export function registerStreamRoutes(app: FastifyInstance, ctx: Ctx) {
     reply.code(200);
     reply.header('content-type', 'video/mp2t');
     reply.header('cache-control', 'no-store');
-    return reply.send(Readable.fromWeb(res.body as never));
+    return reply.send(relayBody(up, t.idleMs));
   });
 
   // Movie: try preferred source, then alternates; flag dead ones.
@@ -179,18 +268,19 @@ export function registerStreamRoutes(app: FastifyInstance, ctx: Ctx) {
     if (sources.length === 0) sources.push(movie);
 
     for (const src of sources) {
-      let res: Response;
+      let up: Upstream;
       try {
-        res = await openUpstream(client.movieUrl(src.stream_id, src.ext), req);
+        up = await openUpstream(client.movieUrl(src.stream_id, src.ext), req, t);
       } catch (e) {
         req.log.warn({ stream_id: src.stream_id, err: String(e) }, 'upstream error');
         continue;
       }
+      const res = up.res;
       if (looksLikeVideo(res)) {
         if (src.stream_id !== movie.stream_id) {
           ctx.db.prepare('UPDATE movie SET stream_id = ?, ext = ? WHERE key = ?').run(src.stream_id, src.ext, key);
         }
-        return pipeUpstream(res, reply, src.ext);
+        return pipeUpstream(up, reply, src.ext, t);
       }
       req.log.warn({ stream_id: src.stream_id, status: res.status, ct: res.headers.get('content-type') }, 'dead source');
       await res.body?.cancel().catch(() => {});
@@ -210,16 +300,17 @@ export function registerStreamRoutes(app: FastifyInstance, ctx: Ctx) {
     const id = Number((req.params as { id: string }).id);
     const ep = ctx.db.prepare('SELECT id, ext FROM episode WHERE id = ?').get(id) as { id: number; ext: string } | undefined;
     if (!ep) return reply.code(404).send({ error: 'Episodio non trovato' });
-    let res: Response;
+    let up: Upstream;
     try {
-      res = await openUpstream(client.episodeUrl(ep.id, ep.ext), req);
+      up = await openUpstream(client.episodeUrl(ep.id, ep.ext), req, t);
     } catch (e) {
       return reply.code(502).send({ error: `Errore provider: ${String(e)}` });
     }
+    const res = up.res;
     if (!looksLikeVideo(res)) {
       await res.body?.cancel().catch(() => {});
       return reply.code(502).send({ error: `Provider non ha restituito video (HTTP ${res.status})` });
     }
-    return pipeUpstream(res, reply, ep.ext);
+    return pipeUpstream(up, reply, ep.ext, t);
   });
 }
