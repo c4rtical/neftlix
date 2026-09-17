@@ -69,6 +69,8 @@ export type PlayerApi = {
   toggle: () => void;
   toggleMute: () => void;
   seekBy: (delta: number) => void;
+  /** Nudges the volume by `delta` (0..1); raising it from silence also unmutes. */
+  volumeBy: (delta: number) => void;
 };
 
 export function PlayerControls({
@@ -106,6 +108,9 @@ export function PlayerControls({
   const menuRef = useRef<HTMLDivElement>(null);
   const flashTimer = useRef<number | null>(null);
   const seekTimer = useRef<number | null>(null);
+  const [volHint, setVolHint] = useState<{ value: number; leaving: boolean } | null>(null);
+  const volTimer = useRef<number | null>(null);
+  const volLeaveTimer = useRef<number | null>(null);
 
   // ---- Video → UI (events only, no polling) ----
   const readTracks = useCallback((v: HTMLVideoElement) => {
@@ -230,9 +235,21 @@ export function PlayerControls({
     () => () => {
       if (flashTimer.current) window.clearTimeout(flashTimer.current);
       if (seekTimer.current) window.clearTimeout(seekTimer.current);
+      if (volTimer.current) window.clearTimeout(volTimer.current);
+      if (volLeaveTimer.current) window.clearTimeout(volLeaveTimer.current);
     },
     [],
   );
+
+  // Pill at the top with the level just set (↑ ↓ and M). It stays up while the key is held or
+  // pressed again (no remount, so it never flickers) and fades out 700 ms after the last press.
+  const showVolume = useCallback((value: number) => {
+    setVolHint({ value, leaving: false });
+    if (volTimer.current) window.clearTimeout(volTimer.current);
+    if (volLeaveTimer.current) window.clearTimeout(volLeaveTimer.current);
+    volLeaveTimer.current = window.setTimeout(() => setVolHint((h) => (h ? { ...h, leaving: true } : h)), 700);
+    volTimer.current = window.setTimeout(() => setVolHint(null), 900);
+  }, []);
 
   const toggle = useCallback(() => {
     if (!video) return;
@@ -276,15 +293,29 @@ export function PlayerControls({
     onInteract();
     video.muted = !video.muted;
     if (!video.muted && video.volume === 0) video.volume = 0.5;
-  }, [video, onInteract]);
+    showVolume(video.muted ? 0 : video.volume);
+  }, [video, onInteract, showVolume]);
+
+  const volumeBy = useCallback(
+    (delta: number) => {
+      if (!video) return;
+      onInteract();
+      const cur = video.muted ? 0 : video.volume;
+      const val = Math.max(0, Math.min(1, Math.round((cur + delta) * 100) / 100));
+      video.volume = val;
+      video.muted = val === 0;
+      showVolume(val);
+    },
+    [video, onInteract, showVolume],
+  );
 
   useEffect(() => {
     if (!apiRef) return;
-    apiRef.current = { toggle, toggleMute, seekBy };
+    apiRef.current = { toggle, toggleMute, seekBy, volumeBy };
     return () => {
       apiRef.current = null;
     };
-  }, [apiRef, toggle, toggleMute, seekBy]);
+  }, [apiRef, toggle, toggleMute, seekBy, volumeBy]);
 
   const setVol = (val: number) => {
     if (!video) return;
@@ -315,14 +346,14 @@ export function PlayerControls({
     onInteract();
   };
 
-  // Arrow keys on the timeline seek instead of nudging the range by one step.
+  // ← → on the timeline seek 10 s instead of nudging the range by one step; ↑ ↓ keep bubbling
+  // (volume for the player, spatial navigation for the remote).
   const onBarKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    const step = e.key === 'ArrowUp' || e.key === 'ArrowDown' ? 60 : 10;
-    const dir = e.key === 'ArrowRight' || e.key === 'ArrowUp' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowDown' ? -1 : 0;
+    const dir = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
     if (!dir) return;
     e.preventDefault();
     e.stopPropagation();
-    seekBy(dir * step);
+    seekBy(dir * 10);
   };
 
   // Only the horizontal arrows belong to the slider: everything else (M, N, F, and ↑/↓ for
@@ -355,6 +386,15 @@ export function PlayerControls({
             {seekHint.dir < 0 ? '−' : '+'}
             {seekHint.amount} s
           </span>
+        </div>
+      )}
+      {volHint && (
+        <div className={`player-volume ${volHint.leaving ? 'is-leaving' : ''}`} aria-hidden="true">
+          {volHint.value === 0 ? <IconVolumeMute /> : <IconVolume />}
+          <span className="player-volume-bar">
+            <i style={{ width: `${Math.round(volHint.value * 100)}%` }} />
+          </span>
+          <span>{Math.round(volHint.value * 100)}%</span>
         </div>
       )}
       {(flash || waiting) && (
@@ -485,10 +525,10 @@ export function PlayerControls({
           )}
           {live && (
             <>
-              <button className="pc-btn" data-focus aria-label="Canale successivo" title="Canale successivo (↑)" onClick={onNextChannel}>
+              <button className="pc-btn" data-focus aria-label="Canale successivo" title="Canale successivo (PageUp)" onClick={onNextChannel}>
                 <IconChannelUp />
               </button>
-              <button className="pc-btn" data-focus aria-label="Canale precedente" title="Canale precedente (↓)" onClick={onPrevChannel}>
+              <button className="pc-btn" data-focus aria-label="Canale precedente" title="Canale precedente (PageDown)" onClick={onPrevChannel}>
                 <IconChannelDown />
               </button>
             </>

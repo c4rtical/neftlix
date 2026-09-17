@@ -45,6 +45,10 @@ export function Player() {
   const [nearEnd, setNearEnd] = useState(false);
   const lastSave = useRef(0);
   const hideTimer = useRef<number | null>(null);
+  // Set once a pointer (mouse, trackpad, magic remote) is used on this player. A D-pad remote
+  // never moves a pointer. With a pointer around, the arrows always seek: a clicked button keeps
+  // the focus on a PC, and walking the bar with the arrows is what the remote needs, not the mouse.
+  const pointerUser = useRef(false);
 
   const isLive = type === 'live';
   const itemId = type === 'movie' ? decodeURIComponent(id) : id;
@@ -319,14 +323,18 @@ export function Player() {
   // Space / Enter / play-pause key: toggle exactly once. The browser reacts to these keys on its
   // own (a focused element "clicks" on keyup, the media element toggles on keydown), which used to
   // double-toggle. Intercepting in the capture phase on window, before the event reaches anything
-  // else, and stopping it there leaves only our toggle. The window is the whole player surface —
-  // except our own buttons and sliders, where Enter/Space must activate the control under focus.
+  // else, and stopping it there leaves only our toggle. The window is the whole player surface.
+  // Space and the remote's play/pause key always mean play/pause, even with a control under focus
+  // (a button clicked with the mouse keeps the focus, and Space used to press it again). Enter
+  // stays with the focused control: it is the remote's OK key, the only way to press a button
+  // when navigating with the D-pad.
   useEffect(() => {
     const isToggleKey = (k: string) => k === ' ' || k === 'Enter' || k === 'MediaPlayPause';
     const wants = (e: KeyboardEvent) => {
       if (!isToggleKey(e.key)) return false;
       const a = document.activeElement;
       if (!a || !containerRef.current?.contains(a)) return false;
+      if (e.key !== 'Enter') return true;
       return a.tagName !== 'BUTTON' && a.tagName !== 'INPUT' && a.tagName !== 'A';
     };
     const onDown = (e: KeyboardEvent) => {
@@ -355,9 +363,12 @@ export function Player() {
     const v = videoRef.current;
     if (!v) return;
     // Focus sitting on one of our controls: arrows belong to spatial navigation (and to the
-    // timeline's own handler), only the letter shortcuts stay global.
-    const active = document.activeElement;
-    const onControl = !!active && active !== containerRef.current && !!(active as HTMLElement).closest?.('.player-controls');
+    // sliders' own handlers), only the letter shortcuts stay global. Exception: with a pointer in
+    // use the arrows keep seeking even on a focused button (see pointerUser); the sliders keep
+    // their own arrow handling either way.
+    const active = document.activeElement as HTMLElement | null;
+    const inBar = !!active && active !== containerRef.current && !!active.closest?.('.player-controls');
+    const onControl = inBar && (active!.tagName === 'INPUT' || !pointerUser.current);
     const wasHidden = !showUi;
     poke();
     const take = () => {
@@ -383,17 +394,22 @@ export function Player() {
     }
     if (onControl) return;
     // First keystroke while the bar is hidden: bring it up and park the focus on Play/Pausa,
-    // so a remote can walk the controls from there.
-    const parkFocus = () => wasHidden && focusPlay();
+    // so a remote can walk the controls from there. Not with a pointer in use: on a PC the focus
+    // must stay where it is, or the next arrow would walk the bar instead of seeking.
+    const parkFocus = () => wasHidden && !pointerUser.current && focusPlay();
+    if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+      take();
+      apiRef.current?.volumeBy(e.key === 'ArrowUp' ? 0.05 : -0.05);
+      parkFocus();
+      return;
+    }
     if (isLive) {
       switch (e.key) {
-        case 'ArrowUp':
         case 'ChannelUp':
         case 'PageUp':
           take();
           goChannel(meta?.nextChannel);
           return;
-        case 'ArrowDown':
         case 'ChannelDown':
         case 'PageDown':
           take();
@@ -418,14 +434,6 @@ export function Player() {
       case 'MediaRewind':
         take();
         apiRef.current?.seekBy(-10);
-        break;
-      case 'ArrowUp':
-        take();
-        apiRef.current?.seekBy(60);
-        break;
-      case 'ArrowDown':
-        take();
-        apiRef.current?.seekBy(-60);
         break;
     }
     parkFocus();
@@ -459,7 +467,20 @@ export function Player() {
   const later = epg.filter((e) => e !== now).slice(0, 2);
 
   return (
-    <div ref={containerRef} className={`player ${showUi ? 'ui-visible' : ''}`} tabIndex={-1} onMouseMove={poke} onClick={poke} onKeyDown={onKey}>
+    <div
+      ref={containerRef}
+      className={`player ${showUi ? 'ui-visible' : ''}`}
+      tabIndex={-1}
+      onMouseMove={poke}
+      onClick={poke}
+      onKeyDown={onKey}
+      onPointerDownCapture={() => {
+        pointerUser.current = true;
+      }}
+      onPointerMoveCapture={() => {
+        pointerUser.current = true;
+      }}
+    >
       {meta && (
         <video
           ref={setVideoRef}
@@ -495,10 +516,10 @@ export function Player() {
         </div>
         {isLive && (
           <div className="player-channel-nav">
-            <button className="btn btn-ghost" onClick={() => goChannel(meta?.prevChannel)} title="Canale precedente (↓)">
+            <button className="btn btn-ghost" onClick={() => goChannel(meta?.prevChannel)} title="Canale precedente (PageDown)">
               ‹ {meta?.prevChannel?.name ?? ''}
             </button>
-            <button className="btn btn-ghost" onClick={() => goChannel(meta?.nextChannel)} title="Canale successivo (↑)">
+            <button className="btn btn-ghost" onClick={() => goChannel(meta?.nextChannel)} title="Canale successivo (PageUp)">
               {meta?.nextChannel?.name ?? ''} ›
             </button>
           </div>

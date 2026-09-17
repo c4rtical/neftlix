@@ -85,7 +85,8 @@ Or with Compose: `docker compose up -d` (see [`docker-compose.yml`](docker-compo
 | Enter | Open / play |
 | Esc, Backspace | Close the player or the detail page |
 | In the player: ← → | Seek ±10 s |
-| In the player: ↑ ↓ | Seek ±60 s (live: next / previous channel) |
+| In the player: ↑ ↓ | Volume ±5 % |
+| In the player: PageUp, PageDown | Live: next / previous channel |
 | Space | Play / pause |
 | N | Next episode |
 | F | Fullscreen |

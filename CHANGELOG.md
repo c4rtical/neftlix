@@ -4,6 +4,10 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Changed
+- Player shortcuts work with a control selected: Space (and the remote's play/pause key) always toggles playback instead of pressing the focused button, and on a PC (any pointer use) the arrows keep seeking even when a button has the focus; Enter still activates the focused control. With a D-pad remote the arrows keep walking the control bar.
+- ↑ ↓ in the player change the volume by 5 % (raising it from silence unmutes) instead of seeking 60 s, with a volume pill at the top of the picture (also on M) like the ±10 s seek pills; on live channels the channel change moves to PageUp / PageDown (ChannelUp / ChannelDown on remotes).
+
 ## [0.5.6] - 2026-09-18
 
 ### Fixed

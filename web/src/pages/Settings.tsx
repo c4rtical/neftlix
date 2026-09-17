@@ -466,7 +466,7 @@ export function Settings({ status, onChanged }: { status: Status; onChanged: () 
       </section>
       <section className="panel">
         <h3>Comandi da tastiera / telecomando</h3>
-        <p className="muted small">Frecce: naviga · Invio: apri · Esc / Backspace: indietro · Nel player: ←/→ ±10s, ↑/↓ ±60s, spazio play/pausa, N prossimo episodio, F schermo intero.</p>
+        <p className="muted small">Frecce: naviga · Invio: apri · Esc / Backspace: indietro · Nel player: ←/→ ±10s, ↑/↓ volume, PageUp/PageDown cambio canale, spazio play/pausa, M muto, N prossimo episodio, F schermo intero.</p>
       </section>
     </div>
   );

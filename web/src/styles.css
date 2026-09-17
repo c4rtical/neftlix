@@ -1430,6 +1430,67 @@ input {
   }
 }
 
+/* Volume pill (↑ ↓, M): same look as the seek pills, centred near the top. */
+.player-volume {
+  position: absolute;
+  top: 14%;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 3;
+  transform: translateX(-50%);
+  animation: player-volume-in 0.2s ease-out;
+}
+.player-volume.is-leaving {
+  animation: player-volume-out 0.2s ease-out forwards;
+}
+.player-volume svg {
+  width: 28px;
+  height: 28px;
+}
+.player-volume-bar {
+  display: block;
+  width: 120px;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.25);
+  overflow: hidden;
+}
+.player-volume-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: #fff;
+}
+@keyframes player-volume-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) scale(1);
+  }
+}
+@keyframes player-volume-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
 /* Centre feedback: play/pause flash and buffering spinner */
 .player-center {
   position: absolute;
