@@ -311,6 +311,17 @@ export function Settings({ status, onChanged }: { status: Status; onChanged: () 
     }
   };
 
+  const setShowDiscreet = async (showDiscreet: boolean) => {
+    if (!status.profile) return;
+    setBusy(true);
+    try {
+      await api.updateProfile(status.profile.id, { showDiscreet });
+      onChanged();
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <div className="page page-settings">
       <h2>Impostazioni</h2>
@@ -333,6 +344,23 @@ export function Settings({ status, onChanged }: { status: Status; onChanged: () 
           </button>
         </div>
         <p className="muted small">Uscendo dal profilo questo dispositivo torna alla schermata "Chi sta guardando?".</p>
+      </section>
+      <section className="panel">
+        <h3>Categorie riservate</h3>
+        <dl>
+          <dt>Profilo {status.profile?.name ?? ''}</dt>
+          <dd>{status.profile?.showDiscreet ? 'Visibili' : 'Nascoste'}</dd>
+        </dl>
+        <div className="panel-actions">
+          <button className="btn" data-focus onClick={() => setShowDiscreet(!status.profile?.showDiscreet)} disabled={busy || !status.profile}>
+            {status.profile?.showDiscreet ? 'Nascondi' : 'Mostra'}
+          </button>
+        </div>
+        <p className="muted small">
+          Le categorie riservate del provider (contenuti per adulti) e i loro titoli sono nascosti da Film, Serie TV, Live TV, ricerca, home e "Random". La
+          scelta vale solo per questo profilo: gli altri restano come sono. Anche quando sono visibili, questi titoli non lasciano tracce: niente "Continua a
+          guardare" né cronologia delle ricerche.
+        </p>
       </section>
       <section className="panel">
         <h3>Provider</h3>

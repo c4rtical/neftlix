@@ -8,7 +8,7 @@ import { upcomingMatches } from './matches.ts';
 import { getTmdbKey, setTmdbKey, tmdbState, verifyTmdbKey } from './tmdb.ts';
 import { MAIN_COMPETITIONS, channelsForFixture, fallbackCategories, fixtureState, getFixturesKey, loadFixtures, setFixturesKey, sportCategoryIds } from './fixtures.ts';
 import { SPORT_NAMES, channelsForEvent, eventState, loadEvents } from './events.ts';
-import { profileRow } from './profiles.ts';
+import { profileRow, showsDiscreet } from './profiles.ts';
 
 type Ctx = {
   db: Db;
@@ -35,6 +35,16 @@ const MOVIE_CARD_SQL = `m.key AS id, m.title, m.year, m.poster, m.rating, m.back
   p.position AS p_position, p.duration AS p_duration`;
 const movieCardJoin = (profileId: number) => `LEFT JOIN progress p ON p.profile_id = ${profileId} AND p.item_type = 'movie' AND p.item_id = m.key`;
 const SERIES_CARD_SQL = `s.id, s.title, s.year, s.poster, s.rating, s.backdrop`;
+
+/**
+ * Predicates that keep discreet-only content out of a listing for profiles that opted out of it
+ * (see `showsDiscreet`). A movie also filed under a normal category stays visible, as in `isDiscreetItem`.
+ * They expect the usual aliases: `m` (movie), `s` (series), `l` (live_channel).
+ */
+const MOVIE_VISIBLE_SQL = `NOT (EXISTS (SELECT 1 FROM movie_category mc JOIN category c ON c.id = mc.category_id AND c.kind = 'movie' WHERE mc.movie_key = m.key AND c.discreet = 1)
+  AND NOT EXISTS (SELECT 1 FROM movie_category mc JOIN category c ON c.id = mc.category_id AND c.kind = 'movie' WHERE mc.movie_key = m.key AND c.discreet = 0))`;
+const SERIES_VISIBLE_SQL = `NOT EXISTS (SELECT 1 FROM category c WHERE c.id = s.category_id AND c.kind = 'series' AND c.discreet = 1)`;
+const LIVE_VISIBLE_SQL = `NOT EXISTS (SELECT 1 FROM category c WHERE c.id = l.category_id AND c.kind = 'live' AND c.discreet = 1)`;
 
 type MovieRow = { id: string; title: string; year: number | null; poster: string | null; rating: number | null; backdrop: string | null; p_position: number | null; p_duration: number | null };
 type SeriesRow = { id: number; title: string; year: number | null; poster: string | null; rating: number | null; backdrop: string | null };
@@ -150,15 +160,16 @@ export function registerApiRoutes(app: FastifyInstance, ctx: Ctx) {
 
   app.get('/api/categories', async (req) => {
     const kind = (req.query as { kind?: string }).kind === 'series' ? 'series' : 'movie';
+    const visible = showsDiscreet(db, pid(req)) ? '' : 'AND c.discreet = 0';
     if (kind === 'movie') {
       return db
         .prepare(`SELECT c.id, c.name, (SELECT COUNT(*) FROM movie_category mc WHERE mc.category_id = c.id) AS count
-                  FROM category c WHERE c.kind = 'movie' ORDER BY c.position`)
+                  FROM category c WHERE c.kind = 'movie' ${visible} ORDER BY c.position`)
         .all();
     }
     return db
       .prepare(`SELECT c.id, c.name, (SELECT COUNT(*) FROM series s WHERE s.category_id = c.id) AS count
-                FROM category c WHERE c.kind = 'series' ORDER BY c.position`)
+                FROM category c WHERE c.kind = 'series' ${visible} ORDER BY c.position`)
       .all();
   });
 
@@ -176,6 +187,7 @@ export function registerApiRoutes(app: FastifyInstance, ctx: Ctx) {
       where.push('m.title LIKE ?');
       params.push(likePattern(q.q));
     }
+    if (!showsDiscreet(db, pid(req))) where.push(MOVIE_VISIBLE_SQL);
     const order = q.sort === 'title' ? 'm.title COLLATE NOCASE ASC' : q.sort === 'rating' ? 'm.rating DESC NULLS LAST, m.added DESC' : q.sort === 'year' ? 'm.year DESC NULLS LAST, m.added DESC' : 'm.added DESC';
     const w = where.length ? `WHERE ${where.join(' AND ')}` : '';
     const total = (db.prepare(`SELECT COUNT(*) AS n FROM movie m ${w}`).get(...(params as never[])) as { n: number }).n;
@@ -215,6 +227,7 @@ export function registerApiRoutes(app: FastifyInstance, ctx: Ctx) {
       where.push('s.title LIKE ?');
       params.push(likePattern(q.q));
     }
+    if (!showsDiscreet(db, pid(req))) where.push(SERIES_VISIBLE_SQL);
     const order = q.sort === 'title' ? 's.title COLLATE NOCASE ASC' : q.sort === 'rating' ? 's.rating DESC NULLS LAST, s.last_modified DESC' : q.sort === 'year' ? 's.year DESC NULLS LAST, s.last_modified DESC' : 's.last_modified DESC';
     const w = where.length ? `WHERE ${where.join(' AND ')}` : '';
     const total = (db.prepare(`SELECT COUNT(*) AS n FROM series s ${w}`).get(...(params as never[])) as { n: number }).n;
@@ -223,25 +236,27 @@ export function registerApiRoutes(app: FastifyInstance, ctx: Ctx) {
   });
 
   /** One random title of the given kind. Inside a category it draws from that category; from
-   *  "Tutti" it skips titles that live only in discreet categories, so a dice roll never exposes them. */
+   *  "Tutti" it skips titles that live only in discreet categories, so a dice roll never exposes them.
+   *  For a profile that opted out of discreet categories the same rule applies inside a category too. */
   app.get('/api/random', async (req, reply) => {
     const q = req.query as { kind?: string; category?: string };
     const kind = q.kind === 'series' ? 'series' : 'movie';
+    const discreet = showsDiscreet(db, pid(req));
+    const params = q.category ? [q.category] : [];
     if (kind === 'movie') {
-      const where = q.category
-        ? 'WHERE m.key IN (SELECT movie_key FROM movie_category WHERE category_id = ?)'
-        : `WHERE NOT EXISTS (SELECT 1 FROM movie_category mc JOIN category c ON c.id = mc.category_id AND c.kind = 'movie' WHERE mc.movie_key = m.key AND c.discreet = 1)
-             OR EXISTS (SELECT 1 FROM movie_category mc JOIN category c ON c.id = mc.category_id AND c.kind = 'movie' WHERE mc.movie_key = m.key AND c.discreet = 0)`;
-      const params = q.category ? [q.category] : [];
-      const row = db.prepare(`SELECT ${MOVIE_CARD_SQL} FROM movie m ${movieCardJoin(pid(req))} ${where} ORDER BY RANDOM() LIMIT 1`).get(...(params as never[])) as MovieRow | undefined;
+      const where: string[] = [];
+      if (q.category) where.push('m.key IN (SELECT movie_key FROM movie_category WHERE category_id = ?)');
+      if (!q.category || !discreet) where.push(MOVIE_VISIBLE_SQL);
+      const row = db
+        .prepare(`SELECT ${MOVIE_CARD_SQL} FROM movie m ${movieCardJoin(pid(req))} WHERE ${where.join(' AND ')} ORDER BY RANDOM() LIMIT 1`)
+        .get(...(params as never[])) as MovieRow | undefined;
       if (!row) return reply.code(404).send({ error: 'Nessun film' });
       return movieCard(row);
     }
-    const where = q.category
-      ? 'WHERE s.category_id = ?'
-      : `WHERE NOT EXISTS (SELECT 1 FROM category c WHERE c.id = s.category_id AND c.kind = 'series' AND c.discreet = 1)`;
-    const params = q.category ? [q.category] : [];
-    const row = db.prepare(`SELECT ${SERIES_CARD_SQL} FROM series s ${where} ORDER BY RANDOM() LIMIT 1`).get(...(params as never[])) as SeriesRow | undefined;
+    const where: string[] = [];
+    if (q.category) where.push('s.category_id = ?');
+    if (!q.category || !discreet) where.push(SERIES_VISIBLE_SQL);
+    const row = db.prepare(`SELECT ${SERIES_CARD_SQL} FROM series s WHERE ${where.join(' AND ')} ORDER BY RANDOM() LIMIT 1`).get(...(params as never[])) as SeriesRow | undefined;
     if (!row) return reply.code(404).send({ error: 'Nessuna serie' });
     return seriesCard(row);
   });
@@ -300,12 +315,13 @@ export function registerApiRoutes(app: FastifyInstance, ctx: Ctx) {
     const q = String((req.query as { q?: string }).q ?? '').trim();
     if (q.length < 2) return { movies: [], series: [] };
     const pat = likePattern(q);
+    const discreet = showsDiscreet(db, pid(req));
     const movies = db
-      .prepare(`SELECT ${MOVIE_CARD_SQL} FROM movie m ${movieCardJoin(pid(req))} WHERE m.title LIKE ?
+      .prepare(`SELECT ${MOVIE_CARD_SQL} FROM movie m ${movieCardJoin(pid(req))} WHERE m.title LIKE ? ${discreet ? '' : `AND ${MOVIE_VISIBLE_SQL}`}
                 ORDER BY (m.title LIKE ? COLLATE NOCASE) DESC, m.rating DESC NULLS LAST, m.added DESC LIMIT 40`)
       .all(pat, `${q}%`) as MovieRow[];
     const series = db
-      .prepare(`SELECT ${SERIES_CARD_SQL} FROM series s WHERE s.title LIKE ?
+      .prepare(`SELECT ${SERIES_CARD_SQL} FROM series s WHERE s.title LIKE ? ${discreet ? '' : `AND ${SERIES_VISIBLE_SQL}`}
                 ORDER BY (s.title LIKE ? COLLATE NOCASE) DESC, s.rating DESC NULLS LAST, s.last_modified DESC LIMIT 40`)
       .all(pat, `${q}%`) as SeriesRow[];
     return {
@@ -316,9 +332,16 @@ export function registerApiRoutes(app: FastifyInstance, ctx: Ctx) {
 
   app.get('/api/home', async (req) => {
     const rows: { key: string; title: string; items: Card[]; link?: string }[] = [];
+    const discreet = showsDiscreet(db, pid(req));
+    // Personal rows (favourites, watchlist, ...) keep discreet titles in their own pages but stay off the home page.
+    const visibleOnly = (cards: Card[]) =>
+      discreet ? cards : cards.filter((c) => (c.type === 'movie' ? !isDiscreetItem(db, 'movie', c.id) : !isDiscreetSeries(db, Number(c.id))));
     const push = (key: string, title: string, items: Card[], link?: string) => {
+      items = visibleOnly(items);
       if (items.length) rows.push({ key, title, items, link });
     };
+    const mv = discreet ? '' : `AND ${MOVIE_VISIBLE_SQL}`;
+    const sv = discreet ? '' : `AND ${SERIES_VISIBLE_SQL}`;
 
     // 1. Adesso
     push('continue', 'Continua a guardare', continueWatching(db, pid(req)));
@@ -330,21 +353,21 @@ export function registerApiRoutes(app: FastifyInstance, ctx: Ctx) {
 
     // 3. Novità
     const recentMovies = db
-      .prepare(`SELECT ${MOVIE_CARD_SQL} FROM movie m ${movieCardJoin(pid(req))} WHERE m.poster IS NOT NULL ORDER BY m.added DESC LIMIT 30`)
+      .prepare(`SELECT ${MOVIE_CARD_SQL} FROM movie m ${movieCardJoin(pid(req))} WHERE m.poster IS NOT NULL ${mv} ORDER BY m.added DESC LIMIT 30`)
       .all() as MovieRow[];
     push('recent-movies', 'Film aggiunti di recente', recentMovies.map(movieCard), '/movies');
-    const recentSeries = db.prepare(`SELECT ${SERIES_CARD_SQL} FROM series s WHERE s.poster IS NOT NULL ORDER BY s.last_modified DESC LIMIT 30`).all() as SeriesRow[];
+    const recentSeries = db.prepare(`SELECT ${SERIES_CARD_SQL} FROM series s WHERE s.poster IS NOT NULL ${sv} ORDER BY s.last_modified DESC LIMIT 30`).all() as SeriesRow[];
     push('recent-series', 'Serie aggiornate di recente', recentSeries.map(seriesCard), '/series');
 
     // 4. Scopri
     const currentYear = new Date().getFullYear();
     const topMovies = db
-      .prepare(`SELECT ${MOVIE_CARD_SQL} FROM movie m ${movieCardJoin(pid(req))} WHERE m.poster IS NOT NULL AND m.year >= ? AND m.rating >= 6.5
+      .prepare(`SELECT ${MOVIE_CARD_SQL} FROM movie m ${movieCardJoin(pid(req))} WHERE m.poster IS NOT NULL AND m.year >= ? AND m.rating >= 6.5 ${mv}
                 ORDER BY m.rating DESC, m.added DESC LIMIT 30`)
       .all(currentYear - 2) as MovieRow[];
     push('top-movies', 'Film recenti più votati', topMovies.map(movieCard));
     const topSeries = db
-      .prepare(`SELECT ${SERIES_CARD_SQL} FROM series s WHERE s.poster IS NOT NULL AND s.rating >= 7.5 ORDER BY s.rating DESC, s.last_modified DESC LIMIT 30`)
+      .prepare(`SELECT ${SERIES_CARD_SQL} FROM series s WHERE s.poster IS NOT NULL AND s.rating >= 7.5 ${sv} ORDER BY s.rating DESC, s.last_modified DESC LIMIT 30`)
       .all() as SeriesRow[];
     push('top-series', 'Serie più votate', topSeries.map(seriesCard));
 
@@ -424,9 +447,10 @@ export function registerApiRoutes(app: FastifyInstance, ctx: Ctx) {
 
   app.get('/api/live/categories', async (req) => {
     const all = (req.query as { all?: string }).all === '1';
+    const visible = showsDiscreet(db, pid(req)) ? '' : 'AND c.discreet = 0';
     const rows = db
       .prepare(`SELECT c.id, c.name, (SELECT COUNT(*) FROM live_channel l WHERE l.category_id = c.id) AS count
-                FROM category c WHERE c.kind = 'live' ORDER BY c.position`)
+                FROM category c WHERE c.kind = 'live' ${visible} ORDER BY c.position`)
       .all() as { id: string; name: string; count: number }[];
     const nonEmpty = rows.filter((r) => r.count > 0);
     return all ? nonEmpty : nonEmpty.filter((r) => SPORT_RE.test(r.name));
@@ -453,6 +477,7 @@ export function registerApiRoutes(app: FastifyInstance, ctx: Ctx) {
       where.push('l.name LIKE ?');
       params.push(likePattern(q.q));
     }
+    if (!showsDiscreet(db, pid(req))) where.push(LIVE_VISIBLE_SQL);
     const w = where.length ? `WHERE ${where.join(' AND ')}` : '';
     const total = (db.prepare(`SELECT COUNT(*) AS n FROM live_channel l ${w}`).get(...(params as never[])) as { n: number }).n;
     const rows = db

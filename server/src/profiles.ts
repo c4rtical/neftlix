@@ -3,7 +3,8 @@ import type { Db } from './db.ts';
 import { now } from './db.ts';
 
 export const AVATARS = ['red', 'blue', 'green', 'yellow', 'purple', 'orange', 'teal', 'pink'] as const;
-export type Profile = { id: number; name: string; avatar: string };
+/** `showDiscreet`: whether the profile sees the discreet categories (see `DISCREET_CATEGORY_RE`); off by default. */
+export type Profile = { id: number; name: string; avatar: string; showDiscreet: boolean };
 
 const MAX_PROFILES = 5;
 const NAME_MAX = 20;
@@ -30,8 +31,17 @@ export function readProfileCookie(header: string | undefined): number | null {
   return null;
 }
 
+type ProfileRow = { id: number; name: string; avatar: string; show_discreet: number };
+const toProfile = (r: ProfileRow): Profile => ({ id: r.id, name: r.name, avatar: r.avatar, showDiscreet: r.show_discreet === 1 });
+
 export function profileRow(db: Db, id: number): Profile | undefined {
-  return db.prepare('SELECT id, name, avatar FROM profile WHERE id = ?').get(id) as Profile | undefined;
+  const r = db.prepare('SELECT id, name, avatar, show_discreet FROM profile WHERE id = ?').get(id) as ProfileRow | undefined;
+  return r && toProfile(r);
+}
+
+/** True when the profile has opted in to discreet categories, so they and their titles are listed for it. */
+export function showsDiscreet(db: Db, profileId: number): boolean {
+  return Boolean(db.prepare('SELECT 1 FROM profile WHERE id = ? AND show_discreet = 1').get(profileId));
 }
 
 function isPublic(path: string) {
@@ -43,8 +53,12 @@ function setProfileCookie(reply: FastifyReply, id: number | null) {
   reply.header('set-cookie', value);
 }
 
-function validate(body: { name?: unknown; avatar?: unknown }, partial: boolean): { name?: string; avatar?: string } | string {
-  const out: { name?: string; avatar?: string } = {};
+function validate(body: { name?: unknown; avatar?: unknown; showDiscreet?: unknown }, partial: boolean): { name?: string; avatar?: string; showDiscreet?: boolean } | string {
+  const out: { name?: string; avatar?: string; showDiscreet?: boolean } = {};
+  if (body.showDiscreet !== undefined) {
+    if (typeof body.showDiscreet !== 'boolean') return 'showDiscreet deve essere true o false';
+    out.showDiscreet = body.showDiscreet;
+  }
   if (body.name !== undefined || !partial) {
     const name = String(body.name ?? '').trim();
     if (!name) return 'Il nome è obbligatorio';
@@ -72,7 +86,7 @@ export function registerProfileRoutes(app: FastifyInstance, db: Db) {
   });
 
   app.get('/api/profiles', async (req) => ({
-    items: db.prepare('SELECT id, name, avatar FROM profile ORDER BY id').all() as Profile[],
+    items: (db.prepare('SELECT id, name, avatar, show_discreet FROM profile ORDER BY id').all() as ProfileRow[]).map(toProfile),
     current: req.profileId,
   }));
 
@@ -88,10 +102,11 @@ export function registerProfileRoutes(app: FastifyInstance, db: Db) {
   app.patch('/api/profiles/:id', async (req, reply) => {
     const id = Number((req.params as { id: string }).id);
     if (!profileRow(db, id)) return reply.code(404).send({ error: 'Profilo non trovato' });
-    const v = validate((req.body ?? {}) as { name?: unknown; avatar?: unknown }, true);
+    const v = validate((req.body ?? {}) as { name?: unknown; avatar?: unknown; showDiscreet?: unknown }, true);
     if (typeof v === 'string') return reply.code(400).send({ error: v });
     if (v.name !== undefined) db.prepare('UPDATE profile SET name = ? WHERE id = ?').run(v.name, id);
     if (v.avatar !== undefined) db.prepare('UPDATE profile SET avatar = ? WHERE id = ?').run(v.avatar, id);
+    if (v.showDiscreet !== undefined) db.prepare('UPDATE profile SET show_discreet = ? WHERE id = ?').run(v.showDiscreet ? 1 : 0, id);
     return profileRow(db, id);
   });
 

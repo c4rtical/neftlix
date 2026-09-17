@@ -76,11 +76,12 @@ test('purgeDiscreetProgress drops old resume points of discreet items and keeps 
   await app.close();
 });
 
-test('discreet categories are browsable; search flags their hits so the client keeps them out of its history', async () => {
+test('with discreet categories shown, discreet categories are browsable; search flags their hits so the client keeps them out of its history', async () => {
   const { app, db } = await buildApp();
   seed(db);
   const a = await createAndSelect(app, 'A');
   const as = { headers: { cookie: a.cookie } };
+  await app.inject({ method: 'PATCH', url: `/api/profiles/${a.id}`, payload: { showDiscreet: true }, ...as });
 
   const cats = (await app.inject({ method: 'GET', url: '/api/categories', ...as })).json() as { id: string }[];
   assert.deepEqual(cats.map((c) => c.id), ['1', '9']);

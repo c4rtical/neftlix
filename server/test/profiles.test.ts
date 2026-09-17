@@ -6,13 +6,13 @@ test('profiles: create, list, update, limit', async () => {
   const { app } = await buildApp();
   const r = await app.inject({ method: 'POST', url: '/api/profiles', payload: { name: '  Anna ', avatar: 'blue' } });
   assert.equal(r.statusCode, 200);
-  assert.deepEqual(r.json(), { id: 1, name: 'Anna', avatar: 'blue' });
+  assert.deepEqual(r.json(), { id: 1, name: 'Anna', avatar: 'blue', showDiscreet: false });
 
   assert.equal((await app.inject({ method: 'POST', url: '/api/profiles', payload: { name: '', avatar: 'blue' } })).statusCode, 400);
   assert.equal((await app.inject({ method: 'POST', url: '/api/profiles', payload: { name: 'X', avatar: 'nope' } })).statusCode, 400);
 
   const u = await app.inject({ method: 'PATCH', url: '/api/profiles/1', payload: { name: 'Anna B', avatar: 'green' } });
-  assert.deepEqual(u.json(), { id: 1, name: 'Anna B', avatar: 'green' });
+  assert.deepEqual(u.json(), { id: 1, name: 'Anna B', avatar: 'green', showDiscreet: false });
   assert.equal((await app.inject({ method: 'PATCH', url: '/api/profiles/99', payload: { name: 'x' } })).statusCode, 404);
 
   for (const n of ['B', 'C', 'D', 'E']) await app.inject({ method: 'POST', url: '/api/profiles', payload: { name: n, avatar: 'red' } });
@@ -35,7 +35,7 @@ test('select sets the cookie; status reports the active profile; deselect clears
   assert.equal((await app.inject({ method: 'POST', url: '/api/profiles/99/select' })).statusCode, 404);
 
   const status = await app.inject({ method: 'GET', url: '/api/status', headers: { cookie } });
-  assert.deepEqual((status.json() as { profile: unknown }).profile, { id: 1, name: 'Anna', avatar: 'blue' });
+  assert.deepEqual((status.json() as { profile: unknown }).profile, { id: 1, name: 'Anna', avatar: 'blue', showDiscreet: false });
   assert.equal((status.json() as { profiles: number }).profiles, 1);
 
   const noCookie = await app.inject({ method: 'GET', url: '/api/status' });

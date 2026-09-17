@@ -148,7 +148,8 @@ CREATE TABLE IF NOT EXISTS profile (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
   avatar TEXT NOT NULL,
-  created_at INTEGER NOT NULL
+  created_at INTEGER NOT NULL,
+  show_discreet INTEGER NOT NULL DEFAULT 0   -- 1: this profile sees the discreet categories and their titles
 );
 
 CREATE TABLE IF NOT EXISTS progress (
@@ -205,6 +206,7 @@ function migrate(db: DatabaseSync) {
   }
   if (!columns('progress').includes('profile_id')) migrateProfiles(db);
   if (!columns('series').includes('episodes_enriched_at')) db.exec('ALTER TABLE series ADD COLUMN episodes_enriched_at INTEGER');
+  if (!columns('profile').includes('show_discreet')) db.exec('ALTER TABLE profile ADD COLUMN show_discreet INTEGER NOT NULL DEFAULT 0');
 }
 
 /** 0.1.0 → profiles: user tables gain profile_id; existing data goes to profile 1 "Principale". */

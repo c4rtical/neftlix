@@ -29,7 +29,8 @@ export type SyncState = {
   error: string | null;
 };
 
-export type Profile = { id: number; name: string; avatar: string };
+/** `showDiscreet`: the profile sees the discreet categories and their titles; off by default. */
+export type Profile = { id: number; name: string; avatar: string; showDiscreet: boolean };
 
 /** Avatar keys accepted by the server → CSS colour. Order is the picker order. */
 export const AVATARS: Record<string, string> = {

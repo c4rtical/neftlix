@@ -13,11 +13,12 @@ function seed(db: import('../src/db.ts').Db) {
 
 const TRIES = 40;
 
-test('random: "Tutti" never lands on a purely discreet title, and respects the chosen category', async () => {
+test('random: "Tutti" never lands on a purely discreet title, and respects the chosen category (discreet categories shown)', async () => {
   const { app, db } = await buildApp();
   seed(db);
   const a = await createAndSelect(app, 'A');
   const as = { headers: { cookie: a.cookie } };
+  await app.inject({ method: 'PATCH', url: `/api/profiles/${a.id}`, payload: { showDiscreet: true }, ...as });
   const pick = async (url: string) => {
     const r = await app.inject({ method: 'GET', url, ...as });
     assert.equal(r.statusCode, 200);
