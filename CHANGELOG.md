@@ -4,6 +4,11 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.5.6] - 2026-09-18
+
+### Fixed
+- Playback no longer freezes partway through a movie or episode (it used to need a page reload to resume). The stream proxy's 30 s timeout also covered the body, so every stream was cut 30 s after it started and the browser had to fetch the rest with a new Range request, which it did not always manage. The timeout now applies only to the wait for the provider's headers; a provider that goes silent mid-stream is still dropped after 45 s of no data, and a browser that pauses reading because its buffer is full is never mistaken for one. Same fix for live HLS segments and the raw MPEG-TS passthrough.
+
 ## [0.5.5] - 2026-09-17
 
 ### Changed
