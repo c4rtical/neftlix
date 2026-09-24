@@ -8,3 +8,6 @@ desktop/dist/
 desktop/release/
 .DS_Store
 .superpowers/
+core/dist/
+tv/webos/dist/
+.idea/
