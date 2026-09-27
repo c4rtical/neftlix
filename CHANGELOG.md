@@ -4,6 +4,8 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.5.8] - 2026-09-27
+
 ### Added
 - Remove a film or a series from "Continua a guardare" on the home page: a × on the card (on hover or when selected) or the Delete key. The resume point and the watched episodes stay; the title comes back as soon as you play it again.
 
