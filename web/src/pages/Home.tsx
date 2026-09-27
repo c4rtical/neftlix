@@ -79,6 +79,17 @@ export function Home({ status }: { status: Status }) {
   if (error) return <div className="page error">{error}</div>;
   if (!rows) return <div className="page muted">Caricamento…</div>;
 
+  // Optimistic: the card leaves the row at once; on failure the next home load brings it back.
+  const removeFromContinue = (card: Card) => {
+    const cards = document.querySelectorAll<HTMLElement>('.row .card');
+    const focused = document.activeElement as HTMLElement | null;
+    const idx = focused ? Array.from(cards).indexOf(focused) : -1;
+    setRows((rs) => (rs ?? []).map((r) => (r.key === 'continue' ? { ...r, items: r.items.filter((c) => !(c.type === card.type && c.id === card.id)) } : r)).filter((r) => r.items.length));
+    // Keep the remote/keyboard user in place: focus the card that slid into the removed one's slot.
+    if (idx >= 0) requestAnimationFrame(() => document.querySelectorAll<HTMLElement>('.row .card')[idx]?.focus({ preventScroll: true }));
+    api.hideContinue(card.type, card.id).catch(() => {});
+  };
+
   const hero = rows.find((r) => r.key === 'continue')?.items[0] ?? rows.find((r) => r.key === 'top-movies')?.items[0] ?? rows[0]?.items[0];
   const syncing = status.sync.running;
 
@@ -92,7 +103,7 @@ export function Home({ status }: { status: Status }) {
       {hero && <Hero card={hero} />}
       {strip.length > 0 && <SportStrip items={strip} />}
       {rows.map((r) => (
-        <Row key={r.key} title={r.title} items={r.items} link={r.link} wide={r.key === 'continue'} />
+        <Row key={r.key} title={r.title} items={r.items} link={r.link} wide={r.key === 'continue'} onRemove={r.key === 'continue' ? removeFromContinue : undefined} />
       ))}
       {rows.length === 0 && !syncing && <div className="muted">Catalogo vuoto. Avvia una sincronizzazione dalle impostazioni.</div>}
     </div>

@@ -463,6 +463,40 @@ input {
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
+.card-remove {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 50%;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.65);
+  cursor: pointer;
+  transition: opacity 0.15s ease, background 0.15s ease;
+}
+.card-remove svg {
+  width: 16px;
+  height: 16px;
+}
+.card-remove:hover {
+  background: rgba(0, 0, 0, 0.9);
+  border-color: #fff;
+}
+@media (hover: hover) and (pointer: fine) {
+  .card-remove {
+    opacity: 0;
+  }
+  .card:hover .card-remove,
+  .card:focus .card-remove {
+    opacity: 1;
+  }
+}
 .card-meta {
   padding: 6px 2px 0;
 }

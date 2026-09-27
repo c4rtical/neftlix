@@ -115,7 +115,7 @@ export function registerProfileRoutes(app: FastifyInstance, db: Db) {
     if (!profileRow(db, id)) return reply.code(404).send({ error: 'Profilo non trovato' });
     db.exec('BEGIN');
     try {
-      for (const t of ['progress', 'watchlist', 'favorite']) db.prepare(`DELETE FROM ${t} WHERE profile_id = ?`).run(id);
+      for (const t of ['progress', 'watchlist', 'favorite', 'continue_hidden']) db.prepare(`DELETE FROM ${t} WHERE profile_id = ?`).run(id);
       db.prepare('DELETE FROM profile WHERE id = ?').run(id);
       db.exec('COMMIT');
     } catch (e) {

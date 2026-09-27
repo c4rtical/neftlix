@@ -179,6 +179,15 @@ CREATE TABLE IF NOT EXISTS favorite (
   created_at INTEGER NOT NULL,
   PRIMARY KEY (profile_id, item_type, item_id)
 );
+
+-- Titles removed from "Continua a guardare": hidden until they are played again after hidden_at.
+CREATE TABLE IF NOT EXISTS continue_hidden (
+  profile_id INTEGER NOT NULL,
+  item_type TEXT NOT NULL,      -- 'movie' | 'series'
+  item_id TEXT NOT NULL,        -- movie.key or series.id
+  hidden_at INTEGER NOT NULL,
+  PRIMARY KEY (profile_id, item_type, item_id)
+);
 `;
 
 export function openDb(path: string): Db {

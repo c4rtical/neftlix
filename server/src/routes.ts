@@ -442,6 +442,16 @@ export function registerApiRoutes(app: FastifyInstance, ctx: Ctx) {
     return { ok: true };
   });
 
+  app.post('/api/continue/hide', async (req, reply) => {
+    const b = (req.body ?? {}) as { type?: string; id?: string | number };
+    if ((b.type !== 'movie' && b.type !== 'series') || b.id === undefined) return reply.code(400).send({ error: 'type e id obbligatori' });
+    db.prepare(`
+      INSERT INTO continue_hidden (profile_id, item_type, item_id, hidden_at) VALUES (?, ?, ?, ?)
+      ON CONFLICT(profile_id, item_type, item_id) DO UPDATE SET hidden_at = excluded.hidden_at
+    `).run(pid(req), b.type, String(b.id), now());
+    return { ok: true };
+  });
+
   // ---- Live TV ----
   const SPORT_RE = /sport|calcio|dazn|eurosport|football|soccer|campionato|serie [ab]\b|champions|europa league|conference|nba|nfl|motor|f1|moto|tennis|golf|ufc|wwe|fight|boxing|rugby|basket|pallamano|volley|ciclismo|cycling/i;
 
@@ -776,16 +786,21 @@ function continueWatching(db: Db, profileId: number): Card[] {
     .prepare(`
       SELECT ${MOVIE_CARD_SQL}, p.updated_at AS updated_at FROM progress p JOIN movie m ON m.key = p.item_id
       WHERE p.profile_id = ? AND p.item_type = 'movie' AND p.watched = 0 AND p.position > 30
+        AND NOT EXISTS (SELECT 1 FROM continue_hidden h WHERE h.profile_id = p.profile_id AND h.item_type = 'movie' AND h.item_id = p.item_id AND h.hidden_at >= p.updated_at)
       ORDER BY p.updated_at DESC LIMIT 20
     `)
     .all(profileId) as (MovieRow & { updated_at: number })[];
   const seriesIds = db
     .prepare(`
-      SELECT p.series_id, MAX(p.updated_at) AS updated_at FROM progress p
-      WHERE p.profile_id = ? AND p.item_type = 'episode' AND p.series_id IS NOT NULL
-      GROUP BY p.series_id ORDER BY updated_at DESC LIMIT 20
+      SELECT t.series_id, t.updated_at FROM (
+        SELECT p.series_id, MAX(p.updated_at) AS updated_at FROM progress p
+        WHERE p.profile_id = ? AND p.item_type = 'episode' AND p.series_id IS NOT NULL
+        GROUP BY p.series_id
+      ) t
+      WHERE NOT EXISTS (SELECT 1 FROM continue_hidden h WHERE h.profile_id = ? AND h.item_type = 'series' AND h.item_id = CAST(t.series_id AS TEXT) AND h.hidden_at >= t.updated_at)
+      ORDER BY t.updated_at DESC LIMIT 20
     `)
-    .all(profileId) as { series_id: number; updated_at: number }[];
+    .all(profileId, profileId) as { series_id: number; updated_at: number }[];
 
   const merged: { updated_at: number; card: Card }[] = movies.map((m) => ({ updated_at: m.updated_at, card: movieCard(m) }));
   for (const s of seriesIds) {

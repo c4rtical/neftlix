@@ -66,6 +66,7 @@ export const api = {
     request<{ ok: true; watched: boolean }>('/api/progress', { method: 'POST', body: JSON.stringify({ type, id, position, duration }) }),
   setWatched: (type: 'movie' | 'episode', id: string | number, watched: boolean) =>
     request<{ ok: true }>('/api/progress/watched', { method: 'POST', body: JSON.stringify({ type, id, watched }) }),
+  hideContinue: (type: 'movie' | 'series', id: string) => request<{ ok: true }>('/api/continue/hide', { method: 'POST', body: JSON.stringify({ type, id }) }),
   clearProgress: (type: 'movie' | 'episode', id: string | number) => request<{ ok: true }>(`/api/progress/${type}/${encodeURIComponent(String(id))}`, { method: 'DELETE' }),
 };
 

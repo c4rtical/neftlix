@@ -4,7 +4,19 @@ import type { Card } from '../types';
 import { PosterCard } from './Card';
 import { IconChevronLeft, IconChevronRight } from './Icons';
 
-export function Row({ title, items, link, wide = false }: { title: string; items: Card[]; link?: string; wide?: boolean }) {
+export function Row({
+  title,
+  items,
+  link,
+  wide = false,
+  onRemove,
+}: {
+  title: string;
+  items: Card[];
+  link?: string;
+  wide?: boolean;
+  onRemove?: (card: Card) => void;
+}) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [canLeft, setCanLeft] = useState(false);
   const [canRight, setCanRight] = useState(false);
@@ -56,7 +68,7 @@ export function Row({ title, items, link, wide = false }: { title: string; items
       <div className="row-body">
         <div className="row-scroll" ref={scrollRef}>
           {items.map((c) => (
-            <PosterCard key={`${c.type}-${c.id}-${c.episodeId ?? ''}`} card={c} wide={wide} />
+            <PosterCard key={`${c.type}-${c.id}-${c.episodeId ?? ''}`} card={c} wide={wide} onRemove={onRemove} />
           ))}
         </div>
         {canLeft && (
