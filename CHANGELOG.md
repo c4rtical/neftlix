@@ -7,6 +7,9 @@ All notable changes to this project are documented here. The format follows [Kee
 ### Added
 - Remove a film or a series from "Continua a guardare" on the home page: a × on the card (on hover or when selected) or the Delete key. The resume point and the watched episodes stay; the title comes back as soon as you play it again.
 
+### Fixed
+- The home banner said "In evidenza" / "Apri" when the first title in "Continua a guardare" was a series whose next episode had not been started yet; it now says "Continua a guardare" with "Riprendi" (or "Guarda" for a fresh next episode).
+
 ## [0.5.7] - 2026-09-18
 
 ### Changed

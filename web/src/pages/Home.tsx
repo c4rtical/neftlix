@@ -8,7 +8,8 @@ import type { StripItem } from '../components/SportStrip';
 import { cardHref } from '../components/Card';
 import { focusFirst } from '../spatial';
 
-function Hero({ card }: { card: Card }) {
+/** `resume`: the card comes from "Continua a guardare" (a series card may point at a next episode not started yet). */
+function Hero({ card, resume }: { card: Card; resume: boolean }) {
   const nav = useNavigate();
   const img = card.backdrop || card.poster;
   const play = () => (card.episodeId ? nav(`/play/episode/${card.episodeId}`) : nav(cardHref(card)));
@@ -16,12 +17,12 @@ function Hero({ card }: { card: Card }) {
     <div className="hero" style={img ? { backgroundImage: `url(${img})` } : undefined}>
       <div className="hero-shade" />
       <div className="hero-body">
-        <div className="hero-kicker">{card.progress ? 'Continua a guardare' : 'In evidenza'}</div>
+        <div className="hero-kicker">{resume ? 'Continua a guardare' : 'In evidenza'}</div>
         <h1>{card.title}</h1>
         <div className="muted">{card.subtitle ?? [card.year, card.rating ? `★ ${card.rating.toFixed(1)}` : null].filter(Boolean).join(' · ')}</div>
         <div className="hero-actions">
           <button className="btn btn-primary" data-focus onClick={play}>
-            ▶ {card.progress ? 'Riprendi' : 'Apri'}
+            ▶ {card.progress ? 'Riprendi' : resume ? 'Guarda' : 'Apri'}
           </button>
           <button className="btn" data-focus onClick={() => nav(cardHref(card))}>
             Dettagli
@@ -90,7 +91,8 @@ export function Home({ status }: { status: Status }) {
     api.hideContinue(card.type, card.id).catch(() => {});
   };
 
-  const hero = rows.find((r) => r.key === 'continue')?.items[0] ?? rows.find((r) => r.key === 'top-movies')?.items[0] ?? rows[0]?.items[0];
+  const resumeCard = rows.find((r) => r.key === 'continue')?.items[0];
+  const hero = resumeCard ?? rows.find((r) => r.key === 'top-movies')?.items[0] ?? rows[0]?.items[0];
   const syncing = status.sync.running;
 
   return (
@@ -100,7 +102,7 @@ export function Home({ status }: { status: Status }) {
           Sincronizzazione catalogo: {status.sync.stage} {status.sync.total ? `${status.sync.done}/${status.sync.total}` : ''}
         </div>
       )}
-      {hero && <Hero card={hero} />}
+      {hero && <Hero card={hero} resume={hero === resumeCard} />}
       {strip.length > 0 && <SportStrip items={strip} />}
       {rows.map((r) => (
         <Row key={r.key} title={r.title} items={r.items} link={r.link} wide={r.key === 'continue'} onRemove={r.key === 'continue' ? removeFromContinue : undefined} />
