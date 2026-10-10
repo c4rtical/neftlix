@@ -77,7 +77,7 @@ Or with Compose: `docker compose up -d` (see [`docker-compose.yml`](docker-compo
 </details>
 
 <details>
-<summary><b>Keyboard / remote</b></summary>
+<summary><b>Keyboard</b></summary>
 
 | Key | Action |
 |---|---|
@@ -121,24 +121,24 @@ Classic IPTV players are channel lists with a search box. `Neftlix`&nbsp;treats 
 - ❤️ **Watchlist** and favourites, per profile
 - ⚽ **Sports matching**: official kick-off times matched to the channel carrying the game
 - 🔎 **Search** across movies, series and channels
-- 🎞 **Player**: HLS via hls.js, keyboard and remote shortcuts, resume position
+- 🎞 **Player**: HLS via hls.js, keyboard shortcuts, resume position
 - 🧹 **Smart catalogue**: duplicates merged, dead sources skipped, TMDB ids and ratings kept
-- 📱 **Works everywhere**: phone to TV, D-pad navigation, installable as a PWA
+- 🖥 **Desktop app** for macOS and Windows; everything stays on your computer
 
 ---
 
 ## Then it got a little out of hand
 
-It started as "a nicer list of movies". Then I wanted the football fixtures. Then the TV. Then my family wanted their own profiles.
+It started as "a nicer list of movies". Then I wanted the football fixtures. Then my family wanted their own profiles.
 
 <table>
 <tr>
 <td width="50%"><img src="docs/screenshots/sport.png" alt="Sport: this week's fixtures matched to the broadcasting channel" /><br/><b>Sport fixtures.</b> Real kick-off times from a football calendar, matched to the channel that broadcasts the game. Formula 1 and MotoGP sessions and the main tennis tournaments get the same treatment in their own tab. Live matches and races show up on the home page.</td>
-<td width="50%"><b>Open from the TV.</b> Settings → <i>Apri dalla TV</i> → <i>Attiva</i>. The desktop app shows an address such as <code>http://192.168.1.20:53412</code> and a 6-digit PIN: open it in the TV's browser (LG, Samsung, Fire TV Silk, any tablet or phone on the same Wi-Fi), enter the PIN once, pick a profile. The computer stays the brain and must stay on; the video goes from your provider straight to the TV. Windows asks once to allow <code>Neftlix</code> through the firewall on private networks.</td>
+<td width="50%"><b>Local by design.</b> The desktop app runs its own small server on your computer and listens only there: catalogue, profiles, progress and your provider's credentials live in a local database, nothing goes through a cloud. The video goes from your provider straight to the app.</td>
 </tr>
 <tr>
 <td width="50%"><img src="docs/screenshots/profiles.png" alt="Who's watching? profile picker" /><br/><b>Profiles.</b> Up to 5 per installation, each with its own resume positions, favourites and watchlist. Every device remembers its last profile.</td>
-<td width="50%"><b>Built for a remote.</b> Spatial navigation everywhere: arrows move focus, Enter plays, Backspace closes, channel up/down in the live player. No mouse needed on a TV. Full list under <a href="#get-it">Keyboard / remote</a>.</td>
+<td width="50%"><b>Keyboard first.</b> Arrows move the focus everywhere, Enter plays, Backspace closes, channel up/down in the live player. Full list under <a href="#get-it">Keyboard</a>.</td>
 </tr>
 </table>
 
@@ -147,7 +147,7 @@ It started as "a nicer list of movies". Then I wanted the football fixtures. The
 ## How it works
 
 ```
-browser / TV ──HTTP──▶ Neftlix server (Node + Fastify + SQLite) ──▶ your Xtream provider
+app / browser ──HTTP──▶ Neftlix server (Node + Fastify + SQLite) ──▶ your Xtream provider
                           │
                           ├─ catalogue cache, dedup, search, home rows
                           ├─ progress, watched, favourites, watchlist
@@ -158,7 +158,7 @@ browser / TV ──HTTP──▶ Neftlix server (Node + Fastify + SQLite) ──
 The browser never talks to the provider directly. Credentials stay in the local database.
 
 - `server/` — Node 23 (native TypeScript, `node:sqlite`), Fastify.
-- `web/` — React + Vite, plain CSS, spatial navigation for remotes, hls.js for live TV.
+- `web/` — React + Vite, plain CSS, keyboard navigation, hls.js for live TV.
 - `docs/xtream-findings.md` — notes on how real Xtream panels behave.
 
 ---
@@ -183,8 +183,6 @@ The browser never talks to the provider directly. Credentials stay in the local 
 - [ ] Automatic catalogue refresh
 - [ ] M3U playlists
 - [ ] Multiple providers
-- [x] Open from the TV browser (LAN switch in the desktop app)
-- [ ] Native Android TV / Fire TV client on the same API
 - [ ] Signed and notarized desktop builds with auto-update
 - [ ] Linux AppImage
 

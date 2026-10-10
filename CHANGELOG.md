@@ -4,6 +4,9 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Removed
+- "Apri dalla TV": the desktop app no longer offers to listen on the local network. Its server only accepts connections from the computer it runs on; the Settings panel, the PIN page and `POST /api/lan/login` are gone (`createApp` no longer takes a `lan` option). Neftlix is now a desktop app; self-hosting the server with Docker keeps working as before.
+
 ## [0.5.8] - 2026-09-27
 
 ### Added

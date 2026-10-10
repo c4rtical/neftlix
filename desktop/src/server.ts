@@ -4,23 +4,15 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
-type LanOptions = { secret: string; getPin: () => string };
-
 type ServerModule = {
-  createApp: (opts: { dataDir: string; webDist?: string; logLevel?: string; lan?: LanOptions }) => Promise<{
+  createApp: (opts: { dataDir: string; webDist?: string; logLevel?: string}) => Promise<{
     listen: (host: string, port: number) => Promise<string>;
     close: () => Promise<void>;
   }>;
 };
 
-/** `url` is always the loopback URL for the app window; `port` is what LAN clients use too. */
-export type RunningServer = { url: string; port: number; host: string; close: () => Promise<void> };
-
-export type StartOptions = {
-  /** '127.0.0.1' (default) or '0.0.0.0' when "Apri dalla TV" is on. */
-  host?: string;
-  lan?: LanOptions;
-};
+/** The server only listens on loopback: `url` is what the app window loads. */
+export type RunningServer = { url: string; port: number; close: () => Promise<void> };
 
 function readSavedPort(portFile: string): number | null {
   try {
@@ -39,14 +31,13 @@ export async function startServer(
   webDist: string,
   debug: boolean,
   log: (line: string) => void = () => {},
-  options: StartOptions = {},
 ): Promise<RunningServer> {
-  const host = options.host ?? '127.0.0.1';
+  const host = '127.0.0.1';
   const mod = (await import(new URL('./server/app.js', import.meta.url).href)) as ServerModule;
   // dataDir is `<userData>/data`, so its parent is userData.
   const portFile = join(dirname(dataDir), 'port.json');
   const savedPort = readSavedPort(portFile);
-  const opts = { dataDir, webDist, logLevel: debug ? 'info' : 'warn', lan: options.lan };
+  const opts = { dataDir, webDist, logLevel: debug ? 'info' : 'warn' };
 
   let handle = await mod.createApp(opts);
   let url: string;
@@ -74,5 +65,5 @@ export async function startServer(
   }
   log(`server listening on ${host}:${effectivePort}`);
 
-  return { url: `http://127.0.0.1:${effectivePort}`, port: effectivePort, host, close: () => handle.close() };
+  return { url: `http://127.0.0.1:${effectivePort}`, port: effectivePort, close: () => handle.close() };
 }
