@@ -4,8 +4,13 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-10
+
 ### Removed
-- "Apri dalla TV": the desktop app no longer offers to listen on the local network. Its server only accepts connections from the computer it runs on; the Settings panel, the PIN page and `POST /api/lan/login` are gone (`createApp` no longer takes a `lan` option). Neftlix is now a desktop app; self-hosting the server with Docker keeps working as before.
+- "Apri dalla TV": the desktop app no longer offers to listen on the local network. Its server only accepts connections from the computer it runs on; the Settings panel, the PIN page and `POST /api/lan/login` are gone (`createApp` no longer takes a `lan` option). To watch from a tablet, a phone or a TV browser, run the server instead (`npm start` or Docker): it listens on the whole network, so other devices open `http://<computer-ip>:8787`, with an optional `NEFTLIX_PASSWORD`.
+
+### Fixed
+- Fullscreen in the player on iPad: Safari's prefixed fullscreen API is used when the standard one is missing, with the native video fullscreen as a fallback.
 
 ## [0.5.8] - 2026-09-27
 
