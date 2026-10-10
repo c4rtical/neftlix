@@ -13,6 +13,7 @@ import {
   IconVolume,
   IconVolumeMute,
 } from './Icons';
+import { isFullscreen, onFullscreenChange, toggleFullscreen as toggleFs } from '../fullscreen';
 
 const VOL_KEY = 'player.volume';
 const MUTED_KEY = 'player.muted';
@@ -199,11 +200,10 @@ export function PlayerControls({
   }, [video, readTracks]);
 
   useEffect(() => {
-    const onFs = () => setFullscreen(!!document.fullscreenElement);
+    const onFs = () => setFullscreen(isFullscreen(video));
     onFs();
-    document.addEventListener('fullscreenchange', onFs);
-    return () => document.removeEventListener('fullscreenchange', onFs);
-  }, []);
+    return onFullscreenChange(onFs, video);
+  }, [video]);
 
   // Hide the menu with the bar.
   useEffect(() => {
@@ -285,7 +285,7 @@ export function PlayerControls({
 
   const toggleFullscreen = () => {
     onInteract();
-    void (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()).catch(() => {});
+    toggleFs(video);
   };
 
   const toggleMute = useCallback(() => {

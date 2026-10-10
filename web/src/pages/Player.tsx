@@ -5,6 +5,7 @@ import { api, beaconProgress, formatTime, streamUrl } from '../api';
 import { PlayerControls, restoreVolume } from '../components/PlayerControls';
 import type { PlayerApi } from '../components/PlayerControls';
 import type { EpgItem } from '../types';
+import { toggleFullscreen } from '../fullscreen';
 
 type PlayType = 'movie' | 'episode' | 'live';
 
@@ -242,7 +243,7 @@ export function Player() {
   const onVideoDoubleClick = () => {
     if (clickTimer.current) window.clearTimeout(clickTimer.current);
     clickTimer.current = null;
-    void (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()).catch(() => {});
+    toggleFullscreen(videoRef.current);
   };
   useEffect(
     () => () => {
@@ -389,7 +390,7 @@ export function Player() {
       case 'f':
       case 'F':
         take();
-        void (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()).catch(() => {});
+        toggleFullscreen(videoRef.current);
         return;
     }
     if (onControl) return;
