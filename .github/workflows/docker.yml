@@ -49,7 +49,7 @@ jobs:
             type=raw,value=edge
             type=raw,value=latest,enable=${{ steps.ver.outputs.release == 'true' }}
             type=raw,value=${{ steps.ver.outputs.version }},enable=${{ steps.ver.outputs.release == 'true' }}
-      - uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v7
         with:
           context: .
           platforms: linux/amd64,linux/arm64
